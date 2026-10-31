@@ -1,0 +1,6 @@
+{
+  "name": "JSB SONS - Luxury Ready Garments & Catalog",
+  "description": "Ultra-smooth luxury ready garments catalog for JSB SONS with automated AI raw multi-garment extractor, Medusa architecture, and WhatsApp direct enquiry integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

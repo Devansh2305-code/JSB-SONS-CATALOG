@@ -1,0 +1,369 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { Product, StoreSettings } from '../types';
+
+const STORAGE_KEY_URL = 'jsb_supabase_url';
+const STORAGE_KEY_ANON = 'jsb_supabase_anon_key';
+
+/**
+ * Returns current Supabase URL and Anon Key from env vars or localStorage config
+ */
+export function getSupabaseCredentials(): { url: string; key: string } {
+  const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+  const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+
+  const storedUrl = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_URL) || '' : '';
+  const storedKey = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_ANON) || '' : '';
+
+  return {
+    url: storedUrl.trim() || envUrl.trim(),
+    key: storedKey.trim() || envKey.trim(),
+  };
+}
+
+let cachedClient: SupabaseClient | null = null;
+let lastUsedUrl = '';
+let lastUsedKey = '';
+
+export function getSupabaseClient(): SupabaseClient | null {
+  const { url, key } = getSupabaseCredentials();
+
+  if (!url || !key) {
+    return null;
+  }
+
+  if (cachedClient && lastUsedUrl === url && lastUsedKey === key) {
+    return cachedClient;
+  }
+
+  try {
+    cachedClient = createClient(url, key, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    });
+    lastUsedUrl = url;
+    lastUsedKey = key;
+    return cachedClient;
+  } catch (err) {
+    console.error('Failed to initialize Supabase client:', err);
+    return null;
+  }
+}
+
+export function isSupabaseConfigured(): boolean {
+  const { url, key } = getSupabaseCredentials();
+  return Boolean(url && key && url.startsWith('http'));
+}
+
+export function saveSupabaseCredentials(url: string, key: string) {
+  if (typeof window !== 'undefined') {
+    if (url.trim()) {
+      localStorage.setItem(STORAGE_KEY_URL, url.trim());
+    } else {
+      localStorage.removeItem(STORAGE_KEY_URL);
+    }
+
+    if (key.trim()) {
+      localStorage.setItem(STORAGE_KEY_ANON, key.trim());
+    } else {
+      localStorage.removeItem(STORAGE_KEY_ANON);
+    }
+  }
+  cachedClient = null;
+  lastUsedUrl = '';
+  lastUsedKey = '';
+}
+
+/**
+ * Tests connection to the Supabase instance
+ */
+export async function testSupabaseConnection(): Promise<{ success: boolean; message: string; count?: number }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      success: false,
+      message: 'Supabase URL or Anon Key is missing. Please configure your project credentials.',
+    };
+  }
+
+  try {
+    const { data, error, count } = await client
+      .from('products')
+      .select('*', { count: 'exact', head: true });
+
+    if (error) {
+      if (error.code === '42P01') {
+        return {
+          success: false,
+          message: 'Connected to Supabase, but the "products" table was not found. Please run the supabase_schema.sql script in your SQL Editor.',
+        };
+      }
+      return { success: false, message: error.message };
+    }
+
+    return {
+      success: true,
+      message: 'Successfully connected to Supabase database!',
+      count: count ?? 0,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Unable to connect to Supabase server.',
+    };
+  }
+}
+
+/**
+ * Fetch all active garments from Supabase products table
+ */
+export async function fetchProductsFromSupabase(): Promise<Product[] | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client
+      .from('products')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Supabase fetch products error:', error.message);
+      return null;
+    }
+
+    if (!data) return [];
+
+    return data.map((row: any): Product => ({
+      id: row.id,
+      sku: row.sku || `JSB-${row.id.slice(0, 6)}`,
+      title: row.title,
+      subtitle: row.subtitle,
+      category: row.category,
+      price: Number(row.price),
+      originalPrice: row.original_price ? Number(row.original_price) : undefined,
+      color: row.color || 'Standard',
+      colorHex: row.color_hex || '#333333',
+      fabric: row.fabric || 'Premium Blend',
+      fit: row.fit || 'Regular Fit',
+      sizes: Array.isArray(row.sizes) ? row.sizes : (typeof row.sizes === 'string' ? JSON.parse(row.sizes) : ['M', 'L', 'XL']),
+      images: Array.isArray(row.images) ? row.images : (typeof row.images === 'string' ? JSON.parse(row.images) : [row.image_url || '']),
+      hangingImageUrl: row.hanging_image_url || undefined,
+      displayMode: row.display_mode || 'hanging',
+      collarStyle: row.collar_style || undefined,
+      sleeveStyle: row.sleeve_style || undefined,
+      description: row.description || '',
+      inStock: row.in_stock !== false,
+      isFeatured: Boolean(row.is_featured),
+      createdAt: row.created_at || new Date().toISOString(),
+      sourceType: row.source_type || 'manual',
+    }));
+  } catch (err) {
+    console.error('Failed to load products from Supabase:', err);
+    return null;
+  }
+}
+
+/**
+ * Insert or update a product in Supabase
+ */
+export async function saveProductToSupabase(product: Product): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) return { success: false, error: 'Supabase client not initialized' };
+
+  try {
+    const row = {
+      id: product.id,
+      sku: product.sku,
+      title: product.title,
+      subtitle: product.subtitle || null,
+      category: product.category,
+      price: product.price,
+      original_price: product.originalPrice || null,
+      color: product.color,
+      color_hex: product.colorHex,
+      fabric: product.fabric,
+      fit: product.fit,
+      sizes: product.sizes,
+      images: product.images,
+      hanging_image_url: product.hangingImageUrl || null,
+      display_mode: product.displayMode || 'hanging',
+      collar_style: product.collarStyle || null,
+      sleeve_style: product.sleeveStyle || null,
+      description: product.description,
+      in_stock: product.inStock,
+      is_featured: product.isFeatured || false,
+      created_at: product.createdAt,
+      source_type: product.sourceType || 'manual',
+    };
+
+    const { error } = await client.from('products').upsert(row, { onConflict: 'id' });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to save product in Supabase' };
+  }
+}
+
+/**
+ * Delete a product by ID from Supabase
+ */
+export async function deleteProductFromSupabase(id: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client.from('products').delete().eq('id', id);
+    if (error) {
+      console.warn('Failed to delete product from Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Delete product error:', err);
+    return false;
+  }
+}
+
+/**
+ * Toggle or update stock status in Supabase
+ */
+export async function updateProductStockInSupabase(id: string, inStock: boolean): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client
+      .from('products')
+      .update({ in_stock: inStock })
+      .eq('id', id);
+
+    return !error;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * Upload an image file or blob to Supabase storage bucket 'garment-images'
+ */
+export async function uploadImageToSupabase(
+  fileOrBlob: Blob | File,
+  suggestedName = `garment-${Date.now()}.jpg`
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: 'Supabase client not configured' };
+  }
+
+  try {
+    const fileName = `${Date.now()}-${suggestedName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const filePath = `products/${fileName}`;
+
+    const { error: uploadError } = await client.storage
+      .from('garment-images')
+      .upload(filePath, fileOrBlob, {
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      return { success: false, error: uploadError.message };
+    }
+
+    const { data } = client.storage.from('garment-images').getPublicUrl(filePath);
+    return { success: true, url: data.publicUrl };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Image upload failed' };
+  }
+}
+
+/**
+ * Sync entire local catalog of products to Supabase
+ */
+export async function bulkSyncProductsToSupabase(products: Product[]): Promise<{ count: number; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) return { count: 0, error: 'Supabase client not configured' };
+
+  try {
+    const rows = products.map((p) => ({
+      id: p.id,
+      sku: p.sku,
+      title: p.title,
+      subtitle: p.subtitle || null,
+      category: p.category,
+      price: p.price,
+      original_price: p.originalPrice || null,
+      color: p.color,
+      color_hex: p.colorHex,
+      fabric: p.fabric,
+      fit: p.fit,
+      sizes: p.sizes,
+      images: p.images,
+      hanging_image_url: p.hangingImageUrl || null,
+      display_mode: p.displayMode || 'hanging',
+      collar_style: p.collarStyle || null,
+      sleeve_style: p.sleeveStyle || null,
+      description: p.description,
+      in_stock: p.inStock,
+      is_featured: p.isFeatured || false,
+      created_at: p.createdAt,
+      source_type: p.sourceType || 'manual',
+    }));
+
+    const { error } = await client.from('products').upsert(rows, { onConflict: 'id' });
+
+    if (error) {
+      return { count: 0, error: error.message };
+    }
+
+    return { count: rows.length };
+  } catch (err: any) {
+    return { count: 0, error: err.message || 'Sync failed' };
+  }
+}
+
+/**
+ * Store settings persistence
+ */
+export async function fetchStoreSettingsFromSupabase(): Promise<StoreSettings | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client
+      .from('store_settings')
+      .select('config')
+      .eq('id', 'default')
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data.config as StoreSettings;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveStoreSettingsToSupabase(settings: StoreSettings): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client.from('store_settings').upsert(
+      {
+        id: 'default',
+        config: settings,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' }
+    );
+    return !error;
+  } catch {
+    return false;
+  }
+}
