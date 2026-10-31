@@ -159,12 +159,10 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
               )}
             </div>
 
-            {/* Hint for initial setup */}
-            <div className="p-2.5 rounded-lg bg-zinc-950/60 border border-zinc-800/80 text-[11px] text-zinc-400 flex items-start gap-2">
-              <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <span>
-                Default store code: <strong className="text-amber-300 font-mono">jsb2025</strong> (you can change this password anytime in Admin Settings).
-              </span>
+            {/* Security notice (No password or hint displayed) */}
+            <div className="p-2.5 rounded-lg bg-zinc-950/60 border border-zinc-800/80 text-[11px] text-zinc-400 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Authorized store owner access only. Sessions are encrypted and protected.</span>
             </div>
 
             {/* Actions */}

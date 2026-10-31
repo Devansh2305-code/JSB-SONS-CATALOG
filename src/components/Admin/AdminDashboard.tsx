@@ -1,16 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Layers,
   PlusCircle,
   Package,
   Settings,
-  LogOut,
   Sparkles,
   ShoppingBag,
   Trash2,
   Check,
   Save,
-  MessageCircle,
   ShieldCheck,
   Search,
   Database,
@@ -19,17 +17,15 @@ import {
   ExternalLink,
   RefreshCw,
   AlertCircle,
-  ArrowUpRight,
+  CheckCircle2,
+  Radio,
 } from 'lucide-react';
 import { Product, StoreSettings } from '../../types';
 import { RawGarmentSlicer } from './RawGarmentSlicer';
 import { ProductImageUploader } from './ProductImageUploader';
 import { getStoredAdminPassword, setStoredAdminPassword } from './AdminPasswordModal';
 import {
-  getSupabaseCredentials,
-  saveSupabaseCredentials,
   testSupabaseConnection,
-  bulkSyncProductsToSupabase,
   isSupabaseConfigured,
 } from '../../services/supabase';
 
@@ -87,11 +83,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newPasswordInput, setNewPasswordInput] = useState('');
   const [passwordNotice, setPasswordNotice] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  // Supabase Configuration State
-  const [supabaseUrl, setSupabaseUrl] = useState('');
-  const [supabaseAnonKey, setSupabaseAnonKey] = useState('');
+  // Supabase Status State (Read-only status dashboard, no manual key typing)
   const [testingSupabase, setTestingSupabase] = useState(false);
-  const [syncingSupabase, setSyncingSupabase] = useState(false);
   const [supabaseStatus, setSupabaseStatus] = useState<{
     tested: boolean;
     success?: boolean;
@@ -101,13 +94,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Inventory search
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Load existing credentials on mount
-  useEffect(() => {
-    const creds = getSupabaseCredentials();
-    setSupabaseUrl(creds.url);
-    setSupabaseAnonKey(creds.key);
-  }, []);
 
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,12 +184,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTimeout(() => setPasswordNotice(null), 4000);
   };
 
-  const handleSaveSupabaseConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    saveSupabaseCredentials(supabaseUrl, supabaseAnonKey);
+  const handleTestDatabaseConnection = async () => {
     setTestingSupabase(true);
-    setSupabaseStatus({ tested: false });
-
     const result = await testSupabaseConnection();
     setTestingSupabase(false);
     setSupabaseStatus({
@@ -212,39 +194,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       message: result.message,
       count: result.count,
     });
-  };
-
-  const handleTestSupabaseOnly = async () => {
-    setTestingSupabase(true);
-    saveSupabaseCredentials(supabaseUrl, supabaseAnonKey);
-    const result = await testSupabaseConnection();
-    setTestingSupabase(false);
-    setSupabaseStatus({
-      tested: true,
-      success: result.success,
-      message: result.message,
-      count: result.count,
-    });
-  };
-
-  const handleSyncToSupabase = async () => {
-    setSyncingSupabase(true);
-    const res = await bulkSyncProductsToSupabase(products);
-    setSyncingSupabase(false);
-    if (res.error) {
-      setSupabaseStatus({
-        tested: true,
-        success: false,
-        message: `Sync failed: ${res.error}`,
-      });
-    } else {
-      setSupabaseStatus({
-        tested: true,
-        success: true,
-        message: `Successfully synchronized all ${res.count} products to your Supabase database!`,
-        count: res.count,
-      });
-    }
   };
 
   const filteredInventory = products.filter(
@@ -254,6 +203,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.color.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const inStockCount = products.filter((p) => p.inStock).length;
+  const soldOutCount = products.length - inStockCount;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
@@ -345,7 +297,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             }`}
           >
             <Database className="w-4 h-4" />
-            <span>Supabase Cloud Storage</span>
+            <span>Cloud Database</span>
           </button>
 
           <button
@@ -374,7 +326,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           />
         )}
 
-        {/* Tab 2: Add Single Product (Direct Photo Upload, No link required) */}
+        {/* Tab 2: Add Single Product (Direct Photo Upload) */}
         {activeTab === 'add-product' && (
           <div className="max-w-3xl mx-auto space-y-6">
             <div className="border-b border-zinc-800 pb-4">
@@ -401,7 +353,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             )}
 
             <form onSubmit={handleCreateProduct} className="space-y-6">
-              {/* Direct Image Dropzone / Upload (Single & Multi-angle) */}
+              {/* Direct Image Dropzone / Upload */}
               <div className="bg-zinc-900/60 p-4 sm:p-5 rounded-xl border border-zinc-800">
                 <ProductImageUploader
                   images={uploadedImages}
@@ -650,47 +602,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
-        {/* Tab 4: Supabase Cloud Database */}
+        {/* Tab 4: Cloud Database & Realtime Status (No manual key typing, auto-sync) */}
         {activeTab === 'supabase' && (
           <div className="max-w-3xl mx-auto space-y-6">
             <div className="border-b border-zinc-800 pb-4">
               <div className="flex items-center gap-2 mb-1">
                 <Database className="w-5 h-5 text-emerald-400" />
                 <h2 className="font-serif text-2xl font-semibold text-zinc-100">
-                  Supabase Cloud Storage & Database
+                  Supabase Cloud Database & Realtime Status
                 </h2>
               </div>
               <p className="text-xs text-zinc-400">
-                Connect your free Supabase PostgreSQL database to store products, stock, and garment photos persistently across all devices and on Vercel.
+                Persistent PostgreSQL database with automatic real-time synchronization across all devices and customers.
               </p>
             </div>
 
             {/* Connection Status Card */}
-            <div className="p-4 sm:p-5 rounded-xl bg-zinc-900 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`w-2.5 h-2.5 rounded-full ${
-                      isSupabaseConfigured() ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                    }`}
-                  />
-                  <h4 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
-                    {isSupabaseConfigured() ? 'Supabase Credentials Configured' : 'Local Storage Mode'}
-                  </h4>
+            <div className="p-5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        isSupabaseConfigured() ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                      }`}
+                    />
+                    <h4 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+                      {isSupabaseConfigured() ? 'Supabase Database Connected' : 'Local Storage Mode (Standby)'}
+                    </h4>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    {isSupabaseConfigured()
+                      ? 'Live real-time sync is active. Any products added, stock changes, or edits instantly broadcast to all users.'
+                      : 'Running in local cache mode. Supabase environment credentials (.env) will activate cloud sync across all devices.'}
+                  </p>
                 </div>
-                <p className="text-xs text-zinc-400 mt-1">
-                  {isSupabaseConfigured()
-                    ? 'Your app will automatically synchronize products and images with Supabase.'
-                    : 'Currently using local browser storage. Add your Supabase project keys below to enable cloud persistence.'}
-                </p>
-              </div>
 
-              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleTestSupabaseOnly}
-                  disabled={testingSupabase || !supabaseUrl || !supabaseAnonKey}
-                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  onClick={handleTestDatabaseConnection}
+                  disabled={testingSupabase}
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
                 >
                   {testingSupabase ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -699,20 +651,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   )}
                   <span>Test Connection</span>
                 </button>
+              </div>
 
-                <button
-                  type="button"
-                  onClick={handleSyncToSupabase}
-                  disabled={syncingSupabase || !isSupabaseConfigured()}
-                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm"
-                >
-                  {syncingSupabase ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  )}
-                  <span>Sync Catalog to Cloud</span>
-                </button>
+              {/* Realtime Live Broadcast Banner */}
+              <div className="p-3.5 rounded-lg bg-zinc-950/80 border border-zinc-800 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+                  <span className="text-zinc-300 font-medium">Automatic Cloud Synchronization</span>
+                </div>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/30">
+                  Auto-Active (Zero Manual Steps)
+                </span>
               </div>
             </div>
 
@@ -741,78 +690,67 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             )}
 
-            {/* Configuration Form */}
-            <form onSubmit={handleSaveSupabaseConfig} className="space-y-4 bg-zinc-900/60 p-5 rounded-xl border border-zinc-800">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-200 mb-1">
-                  Supabase Project URL *
-                </label>
-                <input
-                  type="url"
-                  required
-                  placeholder="https://xyzcompany.supabase.co"
-                  value={supabaseUrl}
-                  onChange={(e) => setSupabaseUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400 font-mono"
-                />
-                <p className="text-[11px] text-zinc-400 mt-1">
-                  Found in your Supabase dashboard under: Project Settings → API → Project URL
-                </p>
+            {/* Metrics Overview Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-center">
+                <span className="text-xl font-bold text-zinc-100">{products.length}</span>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Total Garments</p>
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-200 mb-1">
-                  Supabase Anon (Public) Key *
-                </label>
-                <textarea
-                  rows={2}
-                  required
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  value={supabaseAnonKey}
-                  onChange={(e) => setSupabaseAnonKey(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-amber-400 font-mono"
-                />
-                <p className="text-[11px] text-zinc-400 mt-1">
-                  Found in your Supabase dashboard under: Project Settings → API → Project API Keys → `anon public`
-                </p>
+              <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-center">
+                <span className="text-xl font-bold text-emerald-400">{inStockCount}</span>
+                <p className="text-[11px] text-zinc-400 mt-0.5">In Stock</p>
               </div>
+              <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-center">
+                <span className="text-xl font-bold text-rose-400">{soldOutCount}</span>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Sold Out</p>
+              </div>
+              <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-center">
+                <span className="text-xl font-bold text-amber-400">CDN</span>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Garment Storage</p>
+              </div>
+            </div>
 
-              <div className="pt-2 flex items-center justify-between">
+            {/* Information Card (Explains how DB is managed via environment, not admin UI) */}
+            <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-amber-400" />
+                <span>Zero-Configuration Cloud Architecture</span>
+              </h4>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Supabase credentials are now handled entirely at the system/environment level (<code className="text-amber-300 font-mono bg-zinc-950 px-1 py-0.5 rounded">VITE_SUPABASE_URL</code> and <code className="text-amber-300 font-mono bg-zinc-950 px-1 py-0.5 rounded">VITE_SUPABASE_ANON_KEY</code>).
+              </p>
+              <ul className="text-xs text-zinc-400 list-disc list-inside space-y-1.5">
+                <li><strong className="text-zinc-200">No manual key typing:</strong> Store owners do not need to paste database keys into browser forms.</li>
+                <li><strong className="text-zinc-200">Automatic synchronization:</strong> Adding products, publishing AI-sliced pieces, or toggling stock instantly updates Supabase and updates every customer device in real-time.</li>
+                <li><strong className="text-zinc-200">Global persistence:</strong> All customers and admin devices share the identical PostgreSQL catalogue.</li>
+              </ul>
+            </div>
+
+            {/* SQL Migration Script Reference */}
+            <div className="p-5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <span>Database Schema Reference</span>
+              </h4>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                The database schema is located at <code className="text-amber-300 font-mono bg-zinc-950 px-1 py-0.5 rounded">supabase_schema.sql</code>. If configuring a new Supabase project, execute it in the Supabase SQL Editor to set up:
+              </p>
+              <ul className="text-xs text-zinc-400 list-disc list-inside space-y-1">
+                <li><strong className="text-zinc-200">products</strong> table with pricing, colors, sizes, and images</li>
+                <li><strong className="text-zinc-200">store_settings</strong> table for WhatsApp configuration & announcements</li>
+                <li><strong className="text-zinc-200">garment-images</strong> storage bucket for instant high-speed photo CDN</li>
+                <li>Secure Row Level Security (RLS) policies for instant public reading and admin writing</li>
+              </ul>
+              <div className="pt-2">
                 <a
                   href="https://supabase.com/dashboard"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                  className="text-xs text-amber-400 hover:text-amber-300 inline-flex items-center gap-1"
                 >
                   <span>Open Supabase Dashboard</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
-
-                <button
-                  type="submit"
-                  disabled={testingSupabase}
-                  className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold text-xs rounded-lg transition-colors flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Save & Test Credentials</span>
-                </button>
               </div>
-            </form>
-
-            {/* SQL Migration Script Helper */}
-            <div className="p-5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                <span>SQL Setup Schema (Ready for 1-Click Run)</span>
-              </h4>
-              <p className="text-xs text-zinc-300 leading-relaxed">
-                We have generated a complete, pre-tested database schema in your project root at <code className="text-amber-300 font-mono bg-zinc-950 px-1 py-0.5 rounded">supabase_schema.sql</code>. Copy and paste it in your Supabase SQL Editor to automatically create:
-              </p>
-              <ul className="text-xs text-zinc-400 list-disc list-inside space-y-1">
-                <li><strong className="text-zinc-200">products</strong> table with pricing, colors, sizes, and images</li>
-                <li><strong className="text-zinc-200">store_settings</strong> table for store telephone and announcements</li>
-                <li><strong className="text-zinc-200">garment-images</strong> storage bucket for instant high-speed photo CDN</li>
-                <li>Secure Row Level Security (RLS) policies for instant public reading and admin writing</li>
-              </ul>
             </div>
           </div>
         )}
@@ -836,7 +774,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span>Admin Password Protection</span>
               </div>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                Protect your catalog admin area from unauthorized customer access. Default password is <code className="text-amber-300 font-mono">jsb2025</code>.
+                Protect your catalog admin area from unauthorized customer access. Enter your current and new password below to update access credentials.
               </p>
 
               {passwordNotice && (

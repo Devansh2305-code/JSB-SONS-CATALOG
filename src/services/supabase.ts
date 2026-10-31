@@ -1,23 +1,55 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Product, StoreSettings } from '../types';
 
-const STORAGE_KEY_URL = 'jsb_supabase_url';
-const STORAGE_KEY_ANON = 'jsb_supabase_anon_key';
+// In-memory credentials fetched from server or environment
+let runtimeUrl = '';
+let runtimeKey = '';
 
 /**
- * Returns current Supabase URL and Anon Key from env vars or localStorage config
+ * Returns current Supabase URL and Anon Key from env vars or runtime server config
  */
 export function getSupabaseCredentials(): { url: string; key: string } {
   const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
   const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
-  const storedUrl = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_URL) || '' : '';
-  const storedKey = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_ANON) || '' : '';
+  // Check legacy localStorage only as emergency fallback
+  const storedUrl = typeof window !== 'undefined' ? localStorage.getItem('jsb_supabase_url') || '' : '';
+  const storedKey = typeof window !== 'undefined' ? localStorage.getItem('jsb_supabase_anon_key') || '' : '';
 
-  return {
-    url: storedUrl.trim() || envUrl.trim(),
-    key: storedKey.trim() || envKey.trim(),
-  };
+  const url = (runtimeUrl || envUrl || storedUrl || '').trim();
+  const key = (runtimeKey || envKey || storedKey || '').trim();
+
+  return { url, key };
+}
+
+/**
+ * Automatically fetch public Supabase credentials from backend /api/config
+ * so all connected devices (phones, laptops, customers) connect to the shared database
+ */
+export async function initSupabaseConfig(): Promise<boolean> {
+  const creds = getSupabaseCredentials();
+  if (creds.url && creds.key && creds.url.startsWith('http') && !creds.url.includes('your-project-id')) {
+    return true;
+  }
+
+  try {
+    const res = await fetch('/api/config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.supabaseUrl && data.supabaseAnonKey) {
+        runtimeUrl = data.supabaseUrl.trim();
+        runtimeKey = data.supabaseAnonKey.trim();
+        cachedClient = null;
+        lastUsedUrl = '';
+        lastUsedKey = '';
+        return isSupabaseConfigured();
+      }
+    }
+  } catch (e) {
+    // Backend API not reachable (e.g. static host without server.ts)
+  }
+
+  return isSupabaseConfigured();
 }
 
 let cachedClient: SupabaseClient | null = null;
@@ -27,7 +59,7 @@ let lastUsedKey = '';
 export function getSupabaseClient(): SupabaseClient | null {
   const { url, key } = getSupabaseCredentials();
 
-  if (!url || !key) {
+  if (!url || !key || !url.startsWith('http') || url.includes('your-project-id')) {
     return null;
   }
 
@@ -38,8 +70,13 @@ export function getSupabaseClient(): SupabaseClient | null {
   try {
     cachedClient = createClient(url, key, {
       auth: {
-        persistSession: true,
-        autoRefreshToken: true,
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
       },
     });
     lastUsedUrl = url;
@@ -53,26 +90,7 @@ export function getSupabaseClient(): SupabaseClient | null {
 
 export function isSupabaseConfigured(): boolean {
   const { url, key } = getSupabaseCredentials();
-  return Boolean(url && key && url.startsWith('http'));
-}
-
-export function saveSupabaseCredentials(url: string, key: string) {
-  if (typeof window !== 'undefined') {
-    if (url.trim()) {
-      localStorage.setItem(STORAGE_KEY_URL, url.trim());
-    } else {
-      localStorage.removeItem(STORAGE_KEY_URL);
-    }
-
-    if (key.trim()) {
-      localStorage.setItem(STORAGE_KEY_ANON, key.trim());
-    } else {
-      localStorage.removeItem(STORAGE_KEY_ANON);
-    }
-  }
-  cachedClient = null;
-  lastUsedUrl = '';
-  lastUsedKey = '';
+  return Boolean(url && key && url.startsWith('http') && !url.includes('your-project-id'));
 }
 
 /**
@@ -83,7 +101,7 @@ export async function testSupabaseConnection(): Promise<{ success: boolean; mess
   if (!client) {
     return {
       success: false,
-      message: 'Supabase URL or Anon Key is missing. Please configure your project credentials.',
+      message: 'Supabase URL or Anon Key is missing in the system environment (.env).',
     };
   }
 
@@ -104,7 +122,7 @@ export async function testSupabaseConnection(): Promise<{ success: boolean; mess
 
     return {
       success: true,
-      message: 'Successfully connected to Supabase database!',
+      message: 'Successfully connected to Supabase PostgreSQL database!',
       count: count ?? 0,
     };
   } catch (err: any) {
@@ -113,6 +131,56 @@ export async function testSupabaseConnection(): Promise<{ success: boolean; mess
       message: err.message || 'Unable to connect to Supabase server.',
     };
   }
+}
+
+/**
+ * Real-time subscription to products table changes.
+ * Whenever admin adds, edits stock, or deletes any garment,
+ * this triggers an instant update across ALL customer devices and screens.
+ */
+export function subscribeToProductChanges(onUpdate: () => void): () => void {
+  const client = getSupabaseClient();
+  if (!client) return () => {};
+
+  const channel = client
+    .channel('realtime:products-sync')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'products' },
+      () => {
+        onUpdate();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    client.removeChannel(channel);
+  };
+}
+
+/**
+ * Real-time subscription to store settings (WhatsApp number, announcement notice).
+ */
+export function subscribeToStoreSettingsChanges(onUpdate: (settings: StoreSettings) => void): () => void {
+  const client = getSupabaseClient();
+  if (!client) return () => {};
+
+  const channel = client
+    .channel('realtime:settings-sync')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'store_settings' },
+      (payload) => {
+        if (payload.new && (payload.new as any).config) {
+          onUpdate((payload.new as any).config);
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    client.removeChannel(channel);
+  };
 }
 
 /**
@@ -162,6 +230,30 @@ export async function fetchProductsFromSupabase(): Promise<Product[] | null> {
   } catch (err) {
     console.error('Failed to load products from Supabase:', err);
     return null;
+  }
+}
+
+/**
+ * If Supabase is connected but products table is completely empty,
+ * automatically seed the catalog so all users immediately share the initial products.
+ */
+export async function seedInitialProductsIfEmpty(initialProducts: Product[]): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { count, error } = await client
+      .from('products')
+      .select('id', { count: 'exact', head: true });
+
+    if (error || (count !== null && count > 0)) {
+      return false; // Table not empty or error
+    }
+
+    const res = await bulkSyncProductsToSupabase(initialProducts);
+    return res.count > 0;
+  } catch {
+    return false;
   }
 }
 
@@ -284,7 +376,7 @@ export async function uploadImageToSupabase(
 }
 
 /**
- * Sync entire local catalog of products to Supabase
+ * Bulk sync list of products to Supabase (e.g. from AI Garment Slicer)
  */
 export async function bulkSyncProductsToSupabase(products: Product[]): Promise<{ count: number; error?: string }> {
   const client = getSupabaseClient();

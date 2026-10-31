@@ -30,11 +30,16 @@ import {
   deleteProductFromSupabase,
   updateProductStockInSupabase,
   saveStoreSettingsToSupabase,
+  bulkSyncProductsToSupabase,
   isSupabaseConfigured,
+  initSupabaseConfig,
+  subscribeToProductChanges,
+  subscribeToStoreSettingsChanges,
+  seedInitialProductsIfEmpty,
 } from './services/supabase';
 
 export default function App() {
-  // Store products in state with localStorage persistence
+  // Store products in state with localStorage persistence as local offline fallback
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem('jsb_products');
@@ -56,7 +61,7 @@ export default function App() {
     return DEFAULT_STORE_SETTINGS;
   });
 
-  // Save changes to localStorage
+  // Save changes to localStorage for offline cache
   useEffect(() => {
     try {
       localStorage.setItem('jsb_products', JSON.stringify(products));
@@ -77,27 +82,84 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
-  // Fetch cloud products & settings from Supabase if configured
+  // Initialize Supabase configuration and Realtime cross-device sync
   useEffect(() => {
     let isCancelled = false;
-    const loadSupabaseData = async () => {
-      if (!isSupabaseConfigured()) return;
+    let unsubscribeProducts: (() => void) | null = null;
+    let unsubscribeSettings: (() => void) | null = null;
+
+    const setupDatabaseSync = async () => {
+      // 1. Fetch credentials from env or /api/config so all devices connect
+      await initSupabaseConfig();
+
+      if (!isSupabaseConfigured()) {
+        console.info('Supabase running in local fallback mode.');
+        return;
+      }
+
+      // 2. Fetch live products from Supabase
       try {
-        const cloudProducts = await fetchProductsFromSupabase();
-        if (!isCancelled && cloudProducts && cloudProducts.length > 0) {
-          setProducts(cloudProducts);
+        let cloudProducts = await fetchProductsFromSupabase();
+
+        if (!isCancelled) {
+          if (cloudProducts && cloudProducts.length > 0) {
+            setProducts(cloudProducts);
+          } else if (cloudProducts && cloudProducts.length === 0) {
+            // Empty database table -> auto-seed initial products so all users share them
+            await seedInitialProductsIfEmpty(INITIAL_PRODUCTS);
+            const seeded = await fetchProductsFromSupabase();
+            if (seeded && seeded.length > 0 && !isCancelled) {
+              setProducts(seeded);
+            }
+          }
         }
+
         const cloudSettings = await fetchStoreSettingsFromSupabase();
         if (!isCancelled && cloudSettings) {
           setSettings(cloudSettings);
         }
       } catch (err) {
-        console.warn('Supabase fetch error, fallback to local cache:', err);
+        console.warn('Database initial load error, using local cache:', err);
+      }
+
+      // 3. Set up REALTIME subscriptions: whenever admin modifies anything on their device,
+      // all other connected customer devices immediately update without refreshing!
+      unsubscribeProducts = subscribeToProductChanges(async () => {
+        try {
+          const fresh = await fetchProductsFromSupabase();
+          if (fresh && !isCancelled) {
+            setProducts(fresh);
+          }
+        } catch (e) {
+          console.warn('Realtime product update fetch error:', e);
+        }
+      });
+
+      unsubscribeSettings = subscribeToStoreSettingsChanges((newSettings) => {
+        if (!isCancelled && newSettings) {
+          setSettings(newSettings);
+        }
+      });
+    };
+
+    setupDatabaseSync();
+
+    // Re-verify on window focus (e.g. when customer returns to tab)
+    const handleFocus = async () => {
+      if (isSupabaseConfigured()) {
+        const fresh = await fetchProductsFromSupabase();
+        if (fresh && fresh.length > 0 && !isCancelled) {
+          setProducts(fresh);
+        }
       }
     };
-    loadSupabaseData();
+    window.addEventListener('focus', handleFocus);
+
     return () => {
       isCancelled = true;
+      if (unsubscribeProducts) unsubscribeProducts();
+      if (unsubscribeSettings) unsubscribeSettings();
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 
@@ -212,7 +274,7 @@ export default function App() {
   const handleBulkAddProducts = (newProds: Product[]) => {
     setProducts((prev) => [...newProds, ...prev]);
     if (isSupabaseConfigured()) {
-      newProds.forEach((p) => saveProductToSupabase(p).catch(console.error));
+      bulkSyncProductsToSupabase(newProds).catch(console.error);
     }
   };
 
