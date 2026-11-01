@@ -12,12 +12,8 @@ export function getSupabaseCredentials(): { url: string; key: string } {
   const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
   const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
-  // Check legacy localStorage only as emergency fallback
-  const storedUrl = typeof window !== 'undefined' ? localStorage.getItem('jsb_supabase_url') || '' : '';
-  const storedKey = typeof window !== 'undefined' ? localStorage.getItem('jsb_supabase_anon_key') || '' : '';
-
-  const url = (runtimeUrl || envUrl || storedUrl || '').trim();
-  const key = (runtimeKey || envKey || storedKey || '').trim();
+  const url = (runtimeUrl || envUrl || '').trim();
+  const key = (runtimeKey || envKey || '').trim();
 
   return { url, key };
 }
@@ -27,16 +23,16 @@ export function getSupabaseCredentials(): { url: string; key: string } {
  * so all connected devices (phones, laptops, customers) connect to the shared database
  */
 export async function initSupabaseConfig(): Promise<boolean> {
-  const creds = getSupabaseCredentials();
-  if (creds.url && creds.key && creds.url.startsWith('http') && !creds.url.includes('your-project-id')) {
-    return true;
-  }
-
   try {
     const res = await fetch('/api/config');
     if (res.ok) {
       const data = await res.json();
-      if (data.supabaseUrl && data.supabaseAnonKey) {
+      if (
+        typeof data.supabaseUrl === 'string' &&
+        typeof data.supabaseAnonKey === 'string' &&
+        data.supabaseUrl.trim() &&
+        data.supabaseAnonKey.trim()
+      ) {
         runtimeUrl = data.supabaseUrl.trim();
         runtimeKey = data.supabaseAnonKey.trim();
         cachedClient = null;
@@ -45,8 +41,8 @@ export async function initSupabaseConfig(): Promise<boolean> {
         return isSupabaseConfigured();
       }
     }
-  } catch (e) {
-    // Backend API not reachable (e.g. static host without server.ts)
+  } catch {
+    // Static hosts may not provide the optional runtime endpoint.
   }
 
   return isSupabaseConfigured();
