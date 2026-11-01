@@ -338,6 +338,41 @@ export async function updateProductStockInSupabase(id: string, inStock: boolean)
 }
 
 /**
+ * Make one product the featured product shown first in the storefront.
+ */
+export async function setFeaturedProductInSupabase(id: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error: clearError } = await client
+      .from('products')
+      .update({ is_featured: false })
+      .eq('is_featured', true);
+
+    if (clearError) {
+      console.error('Failed to clear the existing featured product:', clearError.message);
+      return false;
+    }
+
+    const { error: featureError } = await client
+      .from('products')
+      .update({ is_featured: true })
+      .eq('id', id);
+
+    if (featureError) {
+      console.error('Failed to set the featured product:', featureError.message);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Featured product update error:', err);
+    return false;
+  }
+}
+
+/**
  * Upload an image file or blob to Supabase storage bucket 'garment-images'
  */
 export async function uploadImageToSupabase(
