@@ -36,6 +36,7 @@ interface AdminDashboardProps {
   onAddProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
   onToggleStock: (id: string) => void;
+  onSetFeaturedProduct: (id: string) => void;
   onBulkAddProducts: (newProducts: Product[]) => void;
   onExitToStore: () => void;
   onLogoutAdmin: () => void;
@@ -48,6 +49,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onAddProduct,
   onDeleteProduct,
   onToggleStock,
+  onSetFeaturedProduct,
   onBulkAddProducts,
   onExitToStore,
   onLogoutAdmin,
@@ -570,6 +572,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         >
                           {product.inStock ? 'In Stock' : 'Out of Stock'}
                         </span>
+                        {product.isFeatured && (
+                          <span className="text-[10px] px-2 py-0.5 rounded font-medium bg-amber-950/80 text-amber-300 border border-amber-500/30">
+                            Best Product
+                          </span>
+                        )}
                         {product.hangingImageUrl && (
                           <span className="text-[10px] text-zinc-400">🪝 Hanger</span>
                         )}
@@ -578,6 +585,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <div className="flex flex-col items-end gap-2 shrink-0">
+                    <button
+                      onClick={() => onSetFeaturedProduct(product.id)}
+                      disabled={product.isFeatured}
+                      className={`px-2.5 py-1 text-[11px] font-medium rounded border transition-colors cursor-pointer ${
+                        product.isFeatured
+                          ? 'border-amber-500/40 text-amber-300 bg-amber-950/40 cursor-default'
+                          : 'border-zinc-700 hover:bg-amber-400/10 hover:border-amber-500/50 hover:text-amber-300 text-zinc-300'
+                      }`}
+                    >
+                      {product.isFeatured ? 'Best Product' : 'Set as Best'}
+                    </button>
                     <button
                       onClick={() => onToggleStock(product.id)}
                       className="px-2.5 py-1 text-[11px] font-medium rounded border border-zinc-700 hover:bg-zinc-800 text-zinc-300 transition-colors cursor-pointer"

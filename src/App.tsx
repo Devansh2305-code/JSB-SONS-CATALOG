@@ -29,6 +29,7 @@ import {
   saveProductToSupabase,
   deleteProductFromSupabase,
   updateProductStockInSupabase,
+  setFeaturedProductInSupabase,
   saveStoreSettingsToSupabase,
   bulkSyncProductsToSupabase,
   isSupabaseConfigured,
@@ -300,6 +301,19 @@ export default function App() {
     );
   };
 
+  const handleSetFeaturedProduct = (id: string) => {
+    setProducts((prev) =>
+      prev.map((product) => ({
+        ...product,
+        isFeatured: product.id === id,
+      }))
+    );
+
+    if (isSupabaseConfigured()) {
+      setFeaturedProductInSupabase(id).catch(console.error);
+    }
+  };
+
   const handleUpdateSettings = (newSettings: StoreSettings) => {
     setSettings(newSettings);
     if (isSupabaseConfigured()) {
@@ -377,6 +391,7 @@ export default function App() {
         onAddProduct={handleAddProduct}
         onDeleteProduct={handleDeleteProduct}
         onToggleStock={handleToggleStock}
+        onSetFeaturedProduct={handleSetFeaturedProduct}
         onBulkAddProducts={handleBulkAddProducts}
         onExitToStore={() => {
           setIsAdmin(false);
