@@ -7,6 +7,8 @@ import {
   Sparkles,
   ShoppingBag,
   Trash2,
+  Pencil,
+  X,
   Check,
   Save,
   ShieldCheck,
@@ -34,6 +36,7 @@ interface AdminDashboardProps {
   settings: StoreSettings;
   onUpdateSettings: (newSettings: StoreSettings) => void;
   onAddProduct: (product: Product) => void;
+  onUpdateProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
   onToggleStock: (id: string) => void;
   onSetFeaturedProduct: (id: string) => void;
@@ -47,6 +50,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   settings,
   onUpdateSettings,
   onAddProduct,
+  onUpdateProduct,
   onDeleteProduct,
   onToggleStock,
   onSetFeaturedProduct,
@@ -96,6 +100,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Inventory search
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editFormError, setEditFormError] = useState<string | null>(null);
 
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,6 +214,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const inStockCount = products.filter((p) => p.inStock).length;
   const soldOutCount = products.length - inStockCount;
+
+  const handleSaveProductEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    if (!editingProduct.title.trim()) {
+      setEditFormError('Please enter a product title.');
+      return;
+    }
+    if (editingProduct.images.length === 0) {
+      setEditFormError('Please keep at least one product photo.');
+      return;
+    }
+
+    onUpdateProduct({
+      ...editingProduct,
+      title: editingProduct.title.trim(),
+      color: editingProduct.color.trim(),
+      fabric: editingProduct.fabric.trim(),
+      fit: editingProduct.fit.trim(),
+      description: editingProduct.description.trim(),
+      sizes: editingProduct.sizes.map((size) => size.trim()).filter(Boolean),
+    });
+    setEditingProduct(null);
+    setEditFormError(null);
+  };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
@@ -586,6 +618,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <button
+                      onClick={() => {
+                        setEditFormError(null);
+                        setEditingProduct(product);
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-medium rounded border border-amber-500/40 text-amber-300 hover:bg-amber-400/10 transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <Pencil className="w-3 h-3" />
+                      Edit Product
+                    </button>
+                    <button
                       onClick={() => onSetFeaturedProduct(product.id)}
                       disabled={product.isFeatured}
                       className={`px-2.5 py-1 text-[11px] font-medium rounded border transition-colors cursor-pointer ${
@@ -951,6 +993,197 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
       </main>
+
+      {editingProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => setEditingProduct(null)}
+          />
+          <form
+            onSubmit={handleSaveProductEdit}
+            className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl border border-zinc-700 bg-zinc-900 p-5 sm:p-7 shadow-2xl"
+          >
+            <button
+              type="button"
+              onClick={() => setEditingProduct(null)}
+              className="absolute right-4 top-4 rounded-full p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+              aria-label="Close edit product form"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="border-b border-zinc-800 pb-4 pr-8">
+              <h2 className="font-serif text-2xl font-semibold text-zinc-100">Edit Product</h2>
+              <p className="mt-1 text-xs text-zinc-400">
+                Changes publish to the live catalog for all customers.
+              </p>
+            </div>
+
+            {editFormError && (
+              <div className="mt-4 rounded-lg border border-rose-500/40 bg-rose-950/60 p-3 text-xs text-rose-200">
+                {editFormError}
+              </div>
+            )}
+
+            <div className="mt-5 space-y-5">
+              <ProductImageUploader
+                images={editingProduct.images}
+                onChangeImages={(images) => setEditingProduct({ ...editingProduct, images })}
+                hangingImageUrl={editingProduct.hangingImageUrl}
+                onChangeHangingImage={(hangingImageUrl) =>
+                  setEditingProduct({ ...editingProduct, hangingImageUrl, displayMode: 'hanging' })
+                }
+                category={editingProduct.category}
+                color={editingProduct.color}
+                colorHex={editingProduct.colorHex}
+                fabric={editingProduct.fabric}
+              />
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="sm:col-span-2">
+                  <span className="mb-1 block text-xs font-medium text-zinc-300">Product Title *</span>
+                  <input
+                    required
+                    value={editingProduct.title}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, title: e.target.value })}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
+                  />
+                </label>
+
+                <label>
+                  <span className="mb-1 block text-xs font-medium text-zinc-300">Category</span>
+                  <select
+                    value={editingProduct.category}
+                    onChange={(e) =>
+                      setEditingProduct({
+                        ...editingProduct,
+                        category: e.target.value as Product['category'],
+                      })
+                    }
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
+                  >
+                    <option>Shirts</option>
+                    <option>Kurtas & Ethnic</option>
+                    <option>Jackets & Blazers</option>
+                    <option>Trousers & Pants</option>
+                    <option>Festive & Wedding</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span className="mb-1 block text-xs font-medium text-zinc-300">Price (₹)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={editingProduct.price}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, price: Number(e.target.value) })
+                    }
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
+                  />
+                </label>
+
+                <label>
+                  <span className="mb-1 block text-xs font-medium text-zinc-300">Original Price</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingProduct.originalPrice || ''}
+                    onChange={(e) =>
+                      setEditingProduct({
+                        ...editingProduct,
+                        originalPrice: e.target.value ? Number(e.target.value) : undefined,
+                      })
+                    }
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
+                  />
+                </label>
+
+                <label>
+                  <span className="mb-1 block text-xs font-medium text-zinc-300">Color</span>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={editingProduct.colorHex}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, colorHex: e.target.value })}
+                      className="h-10 w-10 shrink-0 rounded border-0 bg-transparent"
+                    />
+                    <input
+                      value={editingProduct.color}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, color: e.target.value })}
+                      className="min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+                </label>
+
+                <label>
+                  <span className="mb-1 block text-xs font-medium text-zinc-300">Fabric</span>
+                  <input
+                    value={editingProduct.fabric}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, fabric: e.target.value })}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
+                  />
+                </label>
+
+                <label>
+                  <span className="mb-1 block text-xs font-medium text-zinc-300">Fit</span>
+                  <input
+                    value={editingProduct.fit}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, fit: e.target.value })}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
+                  />
+                </label>
+
+                <label className="sm:col-span-2">
+                  <span className="mb-1 block text-xs font-medium text-zinc-300">
+                    Available Sizes (comma-separated)
+                  </span>
+                  <input
+                    value={editingProduct.sizes.join(', ')}
+                    onChange={(e) =>
+                      setEditingProduct({
+                        ...editingProduct,
+                        sizes: e.target.value.split(',').map((size) => size.trim()),
+                      })
+                    }
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
+                  />
+                </label>
+
+                <label className="sm:col-span-2">
+                  <span className="mb-1 block text-xs font-medium text-zinc-300">Description</span>
+                  <textarea
+                    rows={4}
+                    value={editingProduct.description}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, description: e.target.value })
+                    }
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3 border-t border-zinc-800 pt-4">
+              <button
+                type="button"
+                onClick={() => setEditingProduct(null)}
+                className="rounded-lg px-4 py-2.5 text-xs font-semibold text-zinc-400 hover:text-zinc-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex items-center gap-2 rounded-lg bg-amber-400 px-5 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-amber-300"
+              >
+                <Save className="h-4 w-4" />
+                Save Product Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
