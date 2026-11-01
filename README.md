@@ -18,7 +18,7 @@ A production-grade, ultra-responsive catalog website and store management platfo
    - **Password-Protected Gate**: Access requires owner admin password configured securely via environment settings.
    - **Direct Photo Upload**: Upload photos directly from phone camera or computer files (no image URLs needed).
    - **Multi-Garment AI Slicer**: Upload a single photo containing 5–6 garments, and Gemini AI will automatically detect, crop, categorize, and render each garment piece on a wooden hanger.
-   - **Inventory Management**: Instant stock toggling (In Stock / Sold Out), real-time pricing updates, and product deletion.
+   - **Inventory Management**: Edit product details and photos, instant stock toggling (In Stock / Sold Out), real-time pricing updates, and product deletion.
    - **Automated Cloud Database Sync**: Built-in integration with Supabase PostgreSQL and Realtime WebSockets for zero-configuration persistent storage and image CDN across all customer devices.
 
 ---
