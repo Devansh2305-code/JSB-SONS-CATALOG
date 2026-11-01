@@ -62,11 +62,13 @@ git push -u origin main
 | Variable Name | Description | Example |
 |---|---|---|
 | `GEMINI_API_KEY` | Google Gemini API Key for AI Garment Separation & Hanger Generation | *(Your Gemini API Key from Google AI Studio)* |
-| `VITE_SUPABASE_URL` | Supabase Project URL | `https://your-project.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | Supabase Public Anon Key | `eyJhbGciOi...` |
+| `SUPABASE_URL` | Supabase Project URL used by the shared runtime config endpoint | `https://your-project.supabase.co` |
+| `SUPABASE_ANON_KEY` | Supabase Public Anon Key used by the shared runtime config endpoint | `******` |
+| `VITE_SUPABASE_URL` | Supabase Project URL for static Vite builds | `https://your-project.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Supabase Public Anon Key for static Vite builds | `******` |
 | `VITE_ADMIN_PASSWORD` | Admin Dashboard Security Password | *(Your secure password)* |
 
-4. Click **Deploy**. Vercel will build the Vite SPA and deploy it globally on high-speed CDN.
+4. Click **Deploy**. Vercel will build the Vite SPA and deploy it globally on high-speed CDN. The `/api/config` serverless endpoint reads the shared `SUPABASE_URL` and `SUPABASE_ANON_KEY` values, so every device uses the same database.
 
 ---
 

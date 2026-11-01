@@ -227,8 +227,8 @@ app.post('/api/ai/generate-hanging-image', async (req: Request, res: Response) =
 // Public client configuration endpoint (provides shared Supabase credentials across all devices)
 app.get('/api/config', (_req, res) => {
   res.json({
-    supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
-    supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+    supabaseUrl: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '',
   });
 });
 
