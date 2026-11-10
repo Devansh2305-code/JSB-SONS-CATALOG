@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Upload, X, Image as ImageIcon, Sparkles, Check, RefreshCw } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Sparkles, Check, RefreshCw, Palette } from 'lucide-react';
 import { renderHangingGarment } from '../../services/hangingGarmentRenderer';
 import { uploadImageToSupabase, isSupabaseConfigured } from '../../services/supabase';
+import { extractColorsFromImage, ExtractedColor } from '../../utils/colorExtractor';
 
 interface ProductImageUploaderProps {
   images: string[];
@@ -12,6 +13,7 @@ interface ProductImageUploaderProps {
   color: string;
   colorHex: string;
   fabric: string;
+  onAutoColorDetected?: (colorName: string, colorHex: string, palette: ExtractedColor[]) => void;
 }
 
 export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
@@ -23,6 +25,7 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
   color,
   colorHex,
   fabric,
+  onAutoColorDetected,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -103,8 +106,27 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
       if (newUrls.length > 0) {
         const updated = [...images, ...newUrls];
         onChangeImages(updated);
-        setUploadNotice(`${newUrls.length} photo${newUrls.length > 1 ? 's' : ''} uploaded successfully!`);
-        setTimeout(() => setUploadNotice(null), 3000);
+
+        // Run auto color detection on the primary garment photo!
+        if (onAutoColorDetected && updated.length > 0) {
+          try {
+            const palette = await extractColorsFromImage(updated[0]);
+            if (palette.length > 0) {
+              onAutoColorDetected(palette[0].name, palette[0].hex, palette);
+              setUploadNotice(
+                `${newUrls.length} photo${newUrls.length > 1 ? 's' : ''} uploaded · Auto-detected color: ${palette[0].name} (${palette[0].hex.toUpperCase()})`
+              );
+            } else {
+              setUploadNotice(`${newUrls.length} photo${newUrls.length > 1 ? 's' : ''} uploaded successfully!`);
+            }
+          } catch {
+            setUploadNotice(`${newUrls.length} photo${newUrls.length > 1 ? 's' : ''} uploaded successfully!`);
+          }
+        } else {
+          setUploadNotice(`${newUrls.length} photo${newUrls.length > 1 ? 's' : ''} uploaded successfully!`);
+        }
+
+        setTimeout(() => setUploadNotice(null), 4000);
       }
     } catch (err: any) {
       console.error('Failed to process image:', err);
@@ -153,8 +175,9 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
         <label className="block text-xs font-semibold text-zinc-200">
           Garment Photo Upload *
         </label>
-        <span className="text-[11px] text-zinc-400">
-          Upload photo from camera or files (No link needed)
+        <span className="text-[11px] text-amber-300/90 flex items-center gap-1">
+          <Sparkles className="w-3 h-3 text-amber-400" />
+          <span>Auto-detects colors from your photo</span>
         </span>
       </div>
 
@@ -196,10 +219,10 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
         </div>
 
         <h4 className="text-sm font-semibold text-zinc-100">
-          {isProcessing ? 'Processing High-Res Photo...' : 'Click or Drag Garment Photo Here'}
+          {isProcessing ? 'Analyzing & Extracting Garment Colors...' : 'Click or Drag Garment Photo Here'}
         </h4>
         <p className="text-xs text-zinc-400 mt-1 max-w-sm">
-          Supports JPEG, PNG, WEBP from your phone camera or laptop storage. Upload 1 or multiple angles.
+          Supports photos from phone camera or files. System automatically extracts the garment color and palette!
         </p>
 
         <button
@@ -208,7 +231,7 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
             e.stopPropagation();
             fileInputRef.current?.click();
           }}
-          className="mt-3.5 px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg border border-zinc-700 transition-colors"
+          className="mt-3.5 px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg border border-zinc-700 transition-colors cursor-pointer"
         >
           Select from Device
         </button>

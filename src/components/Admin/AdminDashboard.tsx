@@ -19,6 +19,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Radio,
+  Pipette,
+  Palette,
 } from 'lucide-react';
 import { Product, StoreSettings } from '../../types';
 import { RawGarmentSlicer } from './RawGarmentSlicer';
@@ -28,6 +30,12 @@ import {
   testSupabaseConnection,
   isSupabaseConfigured,
 } from '../../services/supabase';
+import {
+  extractColorsFromImage,
+  getColorNameFromHex,
+  openEyeDropper,
+  ExtractedColor,
+} from '../../utils/colorExtractor';
 
 interface AdminDashboardProps {
   products: Product[];
@@ -63,6 +71,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [originalPrice, setOriginalPrice] = useState<number>(2990);
   const [color, setColor] = useState('Navy Blue');
   const [colorHex, setColorHex] = useState('#1e3a8a');
+  const [detectedPalette, setDetectedPalette] = useState<ExtractedColor[]>([]);
+  const [isExtractingColor, setIsExtractingColor] = useState(false);
   const [fabric, setFabric] = useState('100% Pure Linen');
   const [fit, setFit] = useState('Modern Slim Fit');
   const [sizes, setSizes] = useState<string>('38 (S), 40 (M), 42 (L), 44 (XL)');
@@ -142,7 +152,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTitle('');
     setUploadedImages([]);
     setUploadedHangingUrl('');
+    setDetectedPalette([]);
     setPrice(2490);
+  };
+
+  const handleAutoColorDetected = (colorName: string, hex: string, palette: ExtractedColor[]) => {
+    setColor(colorName);
+    setColorHex(hex);
+    setDetectedPalette(palette);
+  };
+
+  const handleManualAutoDetect = async () => {
+    if (uploadedImages.length === 0) return;
+    setIsExtractingColor(true);
+    try {
+      const palette = await extractColorsFromImage(uploadedImages[0]);
+      if (palette.length > 0) {
+        setColor(palette[0].name);
+        setColorHex(palette[0].hex);
+        setDetectedPalette(palette);
+      }
+    } finally {
+      setIsExtractingColor(false);
+    }
+  };
+
+  const handleEyeDropperPick = async () => {
+    const picked = await openEyeDropper();
+    if (picked) {
+      setColor(picked.name);
+      setColorHex(picked.hex);
+    }
   };
 
   const handleSaveSettings = (e: React.FormEvent) => {
@@ -326,7 +366,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           />
         )}
 
-        {/* Tab 2: Add Single Product (Direct Photo Upload) */}
+        {/* Tab 2: Add Single Product (Direct Photo Upload & Auto Color Detection) */}
         {activeTab === 'add-product' && (
           <div className="max-w-3xl mx-auto space-y-6">
             <div className="border-b border-zinc-800 pb-4">
@@ -334,7 +374,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 Add New Ready Garment
               </h2>
               <p className="text-xs text-zinc-400 mt-1">
-                Upload garment photos straight from your camera or files. No image URLs needed.
+                Upload garment photos straight from your camera or files. System automatically extracts fabric color and renders on wooden hanger.
               </p>
             </div>
 
@@ -353,17 +393,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             )}
 
             <form onSubmit={handleCreateProduct} className="space-y-6">
-              {/* Direct Image Dropzone / Upload */}
+              {/* Direct Image Dropzone / Upload with Auto-Color Extractor */}
               <div className="bg-zinc-900/60 p-4 sm:p-5 rounded-xl border border-zinc-800">
                 <ProductImageUploader
                   images={uploadedImages}
-                  onChangeImages={setUploadedImages}
+                  onChangeImages={(imgs) => {
+                    setUploadedImages(imgs);
+                    if (imgs.length === 0) {
+                      setDetectedPalette([]);
+                    }
+                  }}
                   hangingImageUrl={uploadedHangingUrl}
                   onChangeHangingImage={setUploadedHangingUrl}
                   category={category}
                   color={color}
                   colorHex={colorHex}
                   fabric={fabric}
+                  onAutoColorDetected={handleAutoColorDetected}
                 />
               </div>
 
@@ -438,25 +484,109 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
-                    Color Name & Color Swatch
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={colorHex}
-                      onChange={(e) => setColorHex(e.target.value)}
-                      className="w-9 h-9 rounded-lg border-0 bg-transparent cursor-pointer shrink-0"
-                    />
+                {/* Auto Color Picker Section */}
+                <div className="sm:col-span-2 bg-zinc-900/70 p-3.5 rounded-xl border border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Palette className="w-4 h-4 text-amber-400" />
+                      <label className="text-xs font-semibold text-zinc-200">
+                        Garment Color & Auto-Detected Palette
+                      </label>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Native Eyedropper API Tool */}
+                      {typeof window !== 'undefined' && 'EyeDropper' in window && (
+                        <button
+                          type="button"
+                          onClick={handleEyeDropperPick}
+                          className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-amber-500/30 rounded text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                          title="Pick exact pixel from garment photo"
+                        >
+                          <Pipette className="w-3.5 h-3.5" />
+                          <span>Pipette / Eyedropper</span>
+                        </button>
+                      )}
+
+                      {/* Manual trigger to scan photo */}
+                      {uploadedImages.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleManualAutoDetect}
+                          disabled={isExtractingColor}
+                          className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{isExtractingColor ? 'Scanning...' : 'Auto-Scan Photo'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Main Color Swatch & Name Inputs */}
+                  <div className="flex items-center gap-2.5">
+                    <div className="relative shrink-0">
+                      <input
+                        type="color"
+                        value={colorHex}
+                        onChange={(e) => {
+                          const newHex = e.target.value;
+                          setColorHex(newHex);
+                          setColor(getColorNameFromHex(newHex));
+                        }}
+                        className="w-10 h-10 rounded-lg border border-zinc-700 bg-transparent cursor-pointer p-0.5"
+                        title="Click to open color palette wheel"
+                      />
+                    </div>
+
                     <input
                       type="text"
                       value={color}
                       onChange={(e) => setColor(e.target.value)}
-                      placeholder="e.g. Navy Blue, Mint Green"
-                      className="flex-1 px-3.5 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                      placeholder="e.g. Royal Navy Blue, Sage Green"
+                      className="flex-1 px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
                     />
+
+                    <span className="text-xs font-mono text-amber-300/90 bg-zinc-950 px-2.5 py-2 rounded-lg border border-zinc-800 shrink-0">
+                      {colorHex.toUpperCase()}
+                    </span>
                   </div>
+
+                  {/* Extracted Color Palette Chips */}
+                  {detectedPalette.length > 0 && (
+                    <div className="pt-2 border-t border-zinc-800/80">
+                      <p className="text-[11px] text-zinc-400 mb-1.5 flex items-center gap-1">
+                        <span>Click any detected swatch to select:</span>
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {detectedPalette.map((p, idx) => {
+                          const isSelected = colorHex.toLowerCase() === p.hex.toLowerCase();
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setColor(p.name);
+                                setColorHex(p.hex);
+                              }}
+                              className={`px-2.5 py-1 rounded-full text-[11px] flex items-center gap-1.5 border transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-amber-400/20 text-amber-200 border-amber-400 font-semibold shadow'
+                                  : 'bg-zinc-950 text-zinc-300 border-zinc-800 hover:border-zinc-700 hover:text-zinc-100'
+                              }`}
+                            >
+                              <span
+                                className="w-3 h-3 rounded-full border border-black/30 shadow-sm shrink-0"
+                                style={{ backgroundColor: p.hex }}
+                              />
+                              <span>{p.name}</span>
+                              {isSelected && <Check className="w-3 h-3 text-amber-400 shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -472,7 +602,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
 
-                <div className="sm:col-span-2">
+                <div>
                   <label className="block text-xs font-medium text-zinc-300 mb-1">
                     Available Sizes (Comma-separated)
                   </label>
@@ -602,7 +732,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
-        {/* Tab 4: Cloud Database & Realtime Status (No manual key typing, auto-sync) */}
+        {/* Tab 4: Cloud Database & Realtime Status */}
         {activeTab === 'supabase' && (
           <div className="max-w-3xl mx-auto space-y-6">
             <div className="border-b border-zinc-800 pb-4">
@@ -710,7 +840,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
-            {/* Information Card (Explains how DB is managed via environment, not admin UI) */}
+            {/* Information Card */}
             <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-amber-400" />
