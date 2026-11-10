@@ -29,6 +29,7 @@ import {
   saveProductToSupabase,
   deleteProductFromSupabase,
   updateProductStockInSupabase,
+  setFeaturedProductInSupabase,
   saveStoreSettingsToSupabase,
   bulkSyncProductsToSupabase,
   isSupabaseConfigured,
@@ -271,6 +272,15 @@ export default function App() {
     }
   };
 
+  const handleUpdateProduct = (updatedProduct: Product) => {
+    setProducts((prev) =>
+      prev.map((product) => (product.id === updatedProduct.id ? updatedProduct : product))
+    );
+    if (isSupabaseConfigured()) {
+      saveProductToSupabase(updatedProduct).catch(console.error);
+    }
+  };
+
   const handleBulkAddProducts = (newProds: Product[]) => {
     setProducts((prev) => [...newProds, ...prev]);
     if (isSupabaseConfigured()) {
@@ -298,6 +308,19 @@ export default function App() {
         return p;
       })
     );
+  };
+
+  const handleSetFeaturedProduct = (id: string) => {
+    setProducts((prev) =>
+      prev.map((product) => ({
+        ...product,
+        isFeatured: product.id === id,
+      }))
+    );
+
+    if (isSupabaseConfigured()) {
+      setFeaturedProductInSupabase(id).catch(console.error);
+    }
   };
 
   const handleUpdateSettings = (newSettings: StoreSettings) => {
@@ -375,8 +398,10 @@ export default function App() {
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
         onAddProduct={handleAddProduct}
+        onUpdateProduct={handleUpdateProduct}
         onDeleteProduct={handleDeleteProduct}
         onToggleStock={handleToggleStock}
+        onSetFeaturedProduct={handleSetFeaturedProduct}
         onBulkAddProducts={handleBulkAddProducts}
         onExitToStore={() => {
           setIsAdmin(false);
