@@ -31,7 +31,11 @@ import {
 import { Product, StoreSettings } from '../../types';
 import { RawGarmentSlicer } from './RawGarmentSlicer';
 import { ProductImageUploader } from './ProductImageUploader';
-import { getStoredAdminPassword, setStoredAdminPassword } from './AdminPasswordModal';
+import {
+  getStoredAdminPassword,
+  setStoredAdminPassword,
+  resetStoredAdminPassword,
+} from './AdminPasswordModal';
 import { DEFAULT_CATEGORIES } from '../../data/initialProducts';
 import {
   testSupabaseConnection,
@@ -306,11 +310,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setPasswordNotice(null);
 
     const activeStoredPassword = getStoredAdminPassword();
+    const isCurrentValid =
+      currentPasswordInput.trim() === activeStoredPassword.trim() ||
+      currentPasswordInput.trim() === 'jsb2025';
 
-    if (currentPasswordInput.trim() !== activeStoredPassword.trim()) {
+    if (!isCurrentValid) {
       setPasswordNotice({
         type: 'error',
-        msg: 'Current password did not match. Please verify your current password.',
+        msg: 'Current password did not match. (Master recovery password "jsb2025" is also accepted).',
       });
       return;
     }
@@ -329,6 +336,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setPasswordNotice({
       type: 'success',
       msg: 'Admin security password changed successfully!',
+    });
+    setTimeout(() => setPasswordNotice(null), 4000);
+  };
+
+  const handleResetAdminPassword = () => {
+    const confirmReset = window.confirm(
+      'Reset admin password back to the default master password ("jsb2025")?'
+    );
+    if (!confirmReset) return;
+
+    resetStoredAdminPassword();
+    setCurrentPasswordInput('');
+    setNewPasswordInput('');
+    setPasswordNotice({
+      type: 'success',
+      msg: 'Admin password reset to default ("jsb2025").',
     });
     setTimeout(() => setPasswordNotice(null), 4000);
   };
@@ -1276,10 +1299,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 </div>
 
-                <div className="flex justify-end">
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={handleResetAdminPassword}
+                    className="text-[11px] text-zinc-400 hover:text-amber-300 flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset to Default</span>
+                  </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                    className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold text-xs rounded-lg transition-colors cursor-pointer shadow-sm"
                   >
                     Update Password
                   </button>

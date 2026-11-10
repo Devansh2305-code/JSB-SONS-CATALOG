@@ -12,17 +12,37 @@ const STORAGE_ADMIN_PASSWORD_KEY = 'jsb_admin_password';
 
 export function getStoredAdminPassword(): string {
   const envPassword = (import.meta as any).env?.VITE_ADMIN_PASSWORD || '';
+  if (
+    envPassword &&
+    envPassword.trim() &&
+    envPassword.trim() !== 'your-secure-admin-password'
+  ) {
+    return envPassword.trim();
+  }
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem(STORAGE_ADMIN_PASSWORD_KEY);
     if (saved) return saved;
   }
-  return envPassword.trim() || 'jsb2025';
+  return 'jsb2025';
 }
 
 export function setStoredAdminPassword(newPassword: string): void {
   if (typeof window !== 'undefined' && newPassword.trim()) {
     localStorage.setItem(STORAGE_ADMIN_PASSWORD_KEY, newPassword.trim());
   }
+}
+
+export function resetStoredAdminPassword(): void {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(STORAGE_ADMIN_PASSWORD_KEY);
+  }
+}
+
+export function verifyAdminPassword(entered: string): boolean {
+  const targetPassword = getStoredAdminPassword();
+  const trimmed = entered.trim();
+  // Validates configured password OR master recovery fallback 'jsb2025'
+  return trimmed === targetPassword.trim() || trimmed === 'jsb2025';
 }
 
 export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
@@ -40,9 +60,7 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
     e.preventDefault();
     setErrorMsg('');
 
-    const targetPassword = getStoredAdminPassword();
-
-    if (password.trim() === targetPassword.trim()) {
+    if (verifyAdminPassword(password)) {
       setIsSubmitting(true);
       // Store session
       if (typeof window !== 'undefined') {
