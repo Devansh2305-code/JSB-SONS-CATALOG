@@ -26,8 +26,8 @@ interface ShowcaseItem {
 const SHOWCASE_ITEMS: ShowcaseItem[] = [
   {
     id: 'sc-1',
-    title: 'Royal Navy Blue Bandhgala',
-    category: 'Jackets & Blazers',
+    title: 'Royal Navy Wedding Bandhgala',
+    category: 'Wedding',
     fabric: 'Wool & Silk Blend',
     tag: 'Brass Crest Buttons',
     price: 8490,
@@ -35,12 +35,12 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     colorHex: '#1e3a8a',
     accentGlow: 'rgba(30, 58, 138, 0.35)',
     image: '/src/assets/images/product_royal_bandhgala_1793439535395.jpg',
-    badge: '👑 Royal Lookbook',
+    badge: '👑 Wedding Edition',
   },
   {
     id: 'sc-2',
-    title: 'Sage Green Artisan Kurta',
-    category: 'Kurtas & Ethnic',
+    title: 'Artisan Festive Linen Kurta',
+    category: 'Ethnic Collection',
     fabric: '100% Pure Linen',
     tag: 'Threadwork Collar',
     price: 3890,
@@ -48,33 +48,46 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     colorHex: '#4d6b53',
     accentGlow: 'rgba(77, 107, 83, 0.35)',
     image: '/src/assets/images/product_artisan_kurta_1793439536709.jpg',
-    badge: '🌿 Summer Linen',
+    badge: '🌿 Ethnic Collection',
   },
   {
     id: 'sc-3',
-    title: 'Indigo Pure Cotton Shirt',
-    category: 'Shirts',
-    fabric: 'Long-Staple Cotton',
-    tag: 'Mother-of-Pearl Buttons',
-    price: 2490,
-    originalPrice: 2990,
-    colorHex: '#1e293b',
-    accentGlow: 'rgba(51, 65, 85, 0.35)',
+    title: 'Government School Uniform Set',
+    category: 'Government School Uniforms',
+    fabric: 'Heavy Duty Poly-Cotton Drill',
+    tag: 'Reinforced Stitches',
+    price: 690,
+    originalPrice: 850,
+    colorHex: '#38bdf8',
+    accentGlow: 'rgba(56, 189, 248, 0.35)',
     image: '/src/assets/images/raw_composite_shirts_1793439532041.jpg',
-    badge: '👔 Everyday Luxury',
+    badge: '🎒 School Uniforms',
   },
   {
     id: 'sc-4',
-    title: 'Emerald Silk Festive Suit',
-    category: 'Festive & Wedding',
-    fabric: 'Raw Silk & Gold Zari',
-    tag: 'Zari Embroidery',
-    price: 7990,
-    originalPrice: 9990,
-    colorHex: '#047857',
-    accentGlow: 'rgba(4, 120, 87, 0.35)',
+    title: 'Corporate Bulk Polo T-Shirt',
+    category: 'Corporate & Bulk T-Shirts',
+    fabric: '220 GSM Bio-Washed Combed Cotton',
+    tag: 'Custom Screen/Embroidery',
+    price: 320,
+    originalPrice: 450,
+    colorHex: '#1e293b',
+    accentGlow: 'rgba(30, 41, 59, 0.35)',
+    image: '/src/assets/images/raw_composite_shirts_1793439532041.jpg',
+    badge: '👕 Corporate & Bulk',
+  },
+  {
+    id: 'sc-5',
+    title: 'Winter Warm Pure Cashmilon V-Neck Sweater',
+    category: 'Winter Collection',
+    fabric: '100% Cashmilon Wool Blend',
+    tag: 'Ribbed Cuffs & Waistband',
+    price: 790,
+    originalPrice: 990,
+    colorHex: '#831843',
+    accentGlow: 'rgba(131, 24, 67, 0.35)',
     image: '/src/assets/images/raw_composite_jackets_1793439535254.jpg',
-    badge: '✨ Wedding Edition',
+    badge: '❄️ Winter Special',
   },
 ];
 
@@ -120,7 +133,7 @@ export const Hero: React.FC<HeroProps> = ({ settings, onExploreClick }) => {
             </h1>
 
             <p className="text-zinc-400 text-xs sm:text-base leading-relaxed mb-5 sm:mb-8">
-              Explore pure cotton shirts, linen kurtas, blazers, and festive sets. Designed for easy fit and all-day comfort. Instant WhatsApp orders and size help.
+              Explore school uniforms (Govt & KV), winter collection, corporate bulk T-shirts with custom printing, ethnic wear, formals, wedding suits, and lab coats. Instant WhatsApp orders and custom quotes.
             </p>
 
             {/* CTAs */}

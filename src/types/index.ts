@@ -3,7 +3,7 @@ export interface Product {
   sku: string;
   title: string;
   subtitle?: string;
-  category: 'Shirts' | 'Kurtas & Ethnic' | 'Jackets & Blazers' | 'Trousers & Pants' | 'Festive & Wedding';
+  category: string;
   price: number;
   originalPrice?: number;
   color: string;
@@ -65,6 +65,7 @@ export interface StoreSettings {
   announcement: string;
   workingHours: string;
   defaultEnquiryMessage: string;
+  categories?: string[];
 }
 
 export interface EnquiryItem {

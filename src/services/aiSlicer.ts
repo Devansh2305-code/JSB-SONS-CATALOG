@@ -132,7 +132,7 @@ export async function callAiGarmentSplitter(
  */
 export function generateHeuristicSlices(
   mode: 'horizontal-5' | 'horizontal-6' | 'grid-2x3',
-  categoryPreset: 'Shirts' | 'Kurtas & Ethnic' | 'Jackets & Blazers'
+  categoryPreset: string = 'Government School Uniforms'
 ): DetectedGarment[] {
   const shirtColors = [
     { name: 'Indigo Navy', hex: '#1e3a5f', fabric: 'Pure Linen Twill', price: 2490 },

@@ -1,6 +1,7 @@
 import React from 'react';
-import { MessageCircle, ShoppingBag, ShieldCheck, ArrowRight } from 'lucide-react';
+import { MessageCircle, ShoppingBag, ChevronDown } from 'lucide-react';
 import { StoreSettings } from '../types';
+import { DEFAULT_CATEGORIES } from '../data/initialProducts';
 
 interface HeaderProps {
   settings: StoreSettings;
@@ -8,14 +9,24 @@ interface HeaderProps {
   onOpenEnquiryDrawer: () => void;
   activeCategory: string;
   onSelectCategory: (cat: string) => void;
+  categories?: string[];
 }
 
 export const Header: React.FC<HeaderProps> = ({
   settings,
   enquiryCount,
   onOpenEnquiryDrawer,
+  activeCategory,
   onSelectCategory,
+  categories,
 }) => {
+  const allCats = categories && categories.length > 0
+    ? categories.filter((c) => c !== 'All')
+    : (settings.categories || DEFAULT_CATEGORIES).filter((c) => c !== 'All');
+
+  const visibleCategories = allCats.slice(0, 4);
+  const overflowCategories = allCats.slice(4);
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-zinc-800/80 bg-zinc-950/95 backdrop-blur-md">
       {/* Top Announcement Bar - Compact single line on phone */}
@@ -62,50 +73,71 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Zone 2: Desktop navigation links (hidden on mobile) */}
-        <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-zinc-300">
+        <nav className="hidden lg:flex items-center gap-3.5 text-xs font-medium text-zinc-300">
           <button
             onClick={() => {
               onSelectCategory('All');
               const el = document.getElementById('catalog-section');
               el?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="hover:text-amber-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer px-2 py-1 rounded ${
+              activeCategory === 'All'
+                ? 'text-amber-300 font-semibold bg-amber-400/10'
+                : 'hover:text-amber-200'
+            }`}
           >
-            All Clothes
+            All Garments
           </button>
-          <button
-            onClick={() => {
-              onSelectCategory('Shirts');
-              const el = document.getElementById('catalog-section');
-              el?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="hover:text-amber-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            Shirts
-          </button>
-          <button
-            onClick={() => {
-              onSelectCategory('Kurtas & Ethnic');
-              const el = document.getElementById('catalog-section');
-              el?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="hover:text-amber-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            Kurtas
-          </button>
-          <button
-            onClick={() => {
-              onSelectCategory('Jackets & Blazers');
-              const el = document.getElementById('catalog-section');
-              el?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="hover:text-amber-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            Jackets & Suits
-          </button>
+
+          {visibleCategories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => {
+                onSelectCategory(cat);
+                const el = document.getElementById('catalog-section');
+                el?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer px-2 py-1 rounded ${
+                activeCategory === cat
+                  ? 'text-amber-300 font-semibold bg-amber-400/10'
+                  : 'hover:text-amber-200'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+
+          {overflowCategories.length > 0 && (
+            <div className="relative group">
+              <button
+                className="flex items-center gap-1 hover:text-amber-200 transition-colors whitespace-nowrap shrink-0 px-2 py-1 cursor-pointer text-zinc-300"
+              >
+                <span>More</span>
+                <ChevronDown className="w-3.5 h-3.5 opacity-70 group-hover:rotate-180 transition-transform" />
+              </button>
+              <div className="absolute top-full left-0 mt-1 hidden group-hover:block bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl p-1.5 min-w-[220px] z-50">
+                {overflowCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      onSelectCategory(cat);
+                      const el = document.getElementById('catalog-section');
+                      el?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className={`w-full text-left px-3 py-2 text-xs rounded hover:bg-zinc-800 transition-colors whitespace-nowrap cursor-pointer ${
+                      activeCategory === cat ? 'text-amber-300 font-semibold bg-zinc-800/80' : 'text-zinc-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <a
             href="#contact-section"
-            className="hover:text-amber-200 transition-colors whitespace-nowrap shrink-0"
+            className="hover:text-amber-200 transition-colors whitespace-nowrap shrink-0 text-zinc-400 pl-2 border-l border-zinc-800"
           >
             Contact Shop
           </a>

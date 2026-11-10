@@ -15,7 +15,7 @@ import {
   Maximize2,
 } from 'lucide-react';
 import { Product, DetectedGarment } from '../../types';
-import { SAMPLE_RAW_COMPOSITES } from '../../data/initialProducts';
+import { SAMPLE_RAW_COMPOSITES, DEFAULT_CATEGORIES } from '../../data/initialProducts';
 import {
   loadImage,
   cropGarmentFromCanvas,
@@ -28,11 +28,13 @@ import { renderHangingGarment } from '../../services/hangingGarmentRenderer';
 interface RawGarmentSlicerProps {
   onPublishProducts: (newProducts: Product[]) => void;
   onExitToStore: () => void;
+  categories?: string[];
 }
 
 export const RawGarmentSlicer: React.FC<RawGarmentSlicerProps> = ({
   onPublishProducts,
   onExitToStore,
+  categories,
 }) => {
   const [selectedRawImage, setSelectedRawImage] = useState<string>(
     SAMPLE_RAW_COMPOSITES[0].imageUrl
@@ -43,7 +45,9 @@ export const RawGarmentSlicer: React.FC<RawGarmentSlicerProps> = ({
   const [detectedGarments, setDetectedGarments] = useState<DetectedGarment[]>([]);
   const [publishedCount, setPublishedCount] = useState<number | null>(null);
   const [activeBoxIndex, setActiveBoxIndex] = useState<number | null>(null);
-  const [categoryPreset, setCategoryPreset] = useState<'Shirts' | 'Kurtas & Ethnic' | 'Jackets & Blazers'>('Shirts');
+  const [categoryPreset, setCategoryPreset] = useState<string>(
+    categories && categories.length > 0 ? categories[0] : 'Government School Uniforms'
+  );
   const [displayView, setDisplayView] = useState<'hanging' | 'crop'>('hanging');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -409,12 +413,14 @@ export const RawGarmentSlicer: React.FC<RawGarmentSlicerProps> = ({
               <span className="text-xs text-zinc-400">Category:</span>
               <select
                 value={categoryPreset}
-                onChange={(e) => setCategoryPreset(e.target.value as any)}
+                onChange={(e) => setCategoryPreset(e.target.value)}
                 className="bg-zinc-950 border border-zinc-700 text-xs text-zinc-200 rounded px-2.5 py-1.5 focus:outline-none focus:border-amber-400"
               >
-                <option value="Shirts">Ready Shirts</option>
-                <option value="Kurtas & Ethnic">Kurtas & Ethnic</option>
-                <option value="Jackets & Blazers">Jackets & Blazers</option>
+                {(categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES).map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

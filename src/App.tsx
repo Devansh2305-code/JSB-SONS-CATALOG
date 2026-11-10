@@ -12,7 +12,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { Product, StoreSettings, EnquiryItem } from './types';
-import { INITIAL_PRODUCTS, DEFAULT_STORE_SETTINGS } from './data/initialProducts';
+import { INITIAL_PRODUCTS, DEFAULT_STORE_SETTINGS, DEFAULT_CATEGORIES } from './data/initialProducts';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { ProductCard } from './components/ProductCard';
@@ -350,15 +350,19 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Derive unique categories and colors
-  const categories = [
-    'All',
-    'Shirts',
-    'Kurtas & Ethnic',
-    'Jackets & Blazers',
-    'Trousers & Pants',
-    'Festive & Wedding',
-  ];
+  // Derive unique categories and colors dynamically from store settings and products
+  const configuredCategories =
+    settings.categories && settings.categories.length > 0
+      ? settings.categories
+      : DEFAULT_CATEGORIES;
+
+  const categories = Array.from(
+    new Set([
+      'All',
+      ...configuredCategories,
+      ...products.map((p) => p.category).filter(Boolean),
+    ])
+  );
 
   const uniqueColors = Array.from(
     new Set(products.map((p) => p.color).filter(Boolean))
@@ -422,6 +426,7 @@ export default function App() {
         onOpenEnquiryDrawer={() => setIsEnquiryDrawerOpen(true)}
         activeCategory={selectedCategory}
         onSelectCategory={(cat) => setSelectedCategory(cat)}
+        categories={categories}
       />
 
       {/* Main Campaign Hero */}

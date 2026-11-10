@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Layers,
   PlusCircle,
@@ -23,11 +23,16 @@ import {
   Radio,
   Pipette,
   Palette,
+  Tags,
+  Plus,
+  FolderPlus,
+  RotateCcw,
 } from 'lucide-react';
 import { Product, StoreSettings } from '../../types';
 import { RawGarmentSlicer } from './RawGarmentSlicer';
 import { ProductImageUploader } from './ProductImageUploader';
 import { getStoredAdminPassword, setStoredAdminPassword } from './AdminPasswordModal';
+import { DEFAULT_CATEGORIES } from '../../data/initialProducts';
 import {
   testSupabaseConnection,
   isSupabaseConfigured,
@@ -70,9 +75,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     'slicer' | 'add-product' | 'inventory' | 'settings' | 'supabase'
   >('slicer');
 
+  // Category list derived from settings and current inventory
+  const activeCategoriesList =
+    settings.categories && settings.categories.length > 0
+      ? settings.categories
+      : DEFAULT_CATEGORIES;
+
+  const availableCategories = useMemo(() => {
+    const fromProducts = products.map((p) => p.category).filter(Boolean);
+    return Array.from(new Set([...activeCategoriesList, ...fromProducts]));
+  }, [activeCategoriesList, products]);
+
   // New Single Product Form State
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<Product['category']>('Shirts');
+  const [category, setCategory] = useState<string>(
+    activeCategoriesList[0] || 'Government School Uniforms'
+  );
+  const [showAddCategoryInline, setShowAddCategoryInline] = useState(false);
+  const [newCategoryInlineInput, setNewCategoryInlineInput] = useState('');
+  const [newCategoryManagerInput, setNewCategoryManagerInput] = useState('');
+  const [categoryManagerNotice, setCategoryManagerNotice] = useState<{
+    type: 'success' | 'error';
+    msg: string;
+  } | null>(null);
+  const [showEditAddCategory, setShowEditAddCategory] = useState(false);
+  const [editNewCategoryInput, setEditNewCategoryInput] = useState('');
   const [price, setPrice] = useState<number>(2490);
   const [originalPrice, setOriginalPrice] = useState<number>(2990);
   const [color, setColor] = useState('Navy Blue');
@@ -112,6 +139,80 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editFormError, setEditFormError] = useState<string | null>(null);
+
+  // Category management handlers
+  const handleAddCustomCategory = (name: string): boolean => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setCategoryManagerNotice({ type: 'error', msg: 'Please type a valid category name.' });
+      return false;
+    }
+
+    const currentCategories =
+      settings.categories && settings.categories.length > 0
+        ? settings.categories
+        : DEFAULT_CATEGORIES;
+
+    if (currentCategories.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+      setCategoryManagerNotice({
+        type: 'error',
+        msg: `Category "${trimmed}" already exists.`,
+      });
+      return false;
+    }
+
+    const updated = [...currentCategories, trimmed];
+    onUpdateSettings({
+      ...settings,
+      categories: updated,
+    });
+    setCategoryManagerNotice({
+      type: 'success',
+      msg: `Category "${trimmed}" added successfully!`,
+    });
+    return true;
+  };
+
+  const handleDeleteCategory = (catToDelete: string) => {
+    const currentCategories =
+      settings.categories && settings.categories.length > 0
+        ? settings.categories
+        : DEFAULT_CATEGORIES;
+
+    const count = products.filter((p) => p.category === catToDelete).length;
+    if (count > 0) {
+      const confirmDelete = window.confirm(
+        `There are ${count} garment(s) currently assigned to "${catToDelete}". Are you sure you want to remove it from the store category list? Existing garments will keep their category tag.`
+      );
+      if (!confirmDelete) return;
+    }
+
+    const updated = currentCategories.filter((c) => c !== catToDelete);
+    onUpdateSettings({
+      ...settings,
+      categories: updated,
+    });
+    setCategoryManagerNotice({
+      type: 'success',
+      msg: `Category "${catToDelete}" has been removed.`,
+    });
+  };
+
+  const handleResetDefaultCategories = () => {
+    const confirmReset = window.confirm(
+      'Reset all categories back to JSB SONS standard garment categories (School Uniforms, Winter, Corporate T-Shirts, Formals, Wedding, Lab Coats)?'
+    );
+    if (!confirmReset) return;
+
+    onUpdateSettings({
+      ...settings,
+      categories: DEFAULT_CATEGORIES,
+    });
+    setCategoryManagerNotice({
+      type: 'success',
+      msg: 'Categories reset to JSB SONS defaults.',
+    });
+  };
 
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
@@ -383,7 +484,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             }`}
           >
             <Settings className="w-4 h-4" />
-            <span>Store & Password</span>
+            <span>Store & Categories</span>
           </button>
         </div>
       </div>
@@ -393,6 +494,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* Tab 1: AI Garment Slicer */}
         {activeTab === 'slicer' && (
           <RawGarmentSlicer
+            categories={availableCategories}
             onPublishProducts={(newProds) => {
               onBulkAddProducts(newProds);
             }}
@@ -464,20 +566,77 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
-                    Category *
-                  </label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
-                  >
-                    <option value="Shirts">Shirts</option>
-                    <option value="Kurtas & Ethnic">Kurtas & Ethnic</option>
-                    <option value="Jackets & Blazers">Jackets & Blazers</option>
-                    <option value="Trousers & Pants">Trousers & Pants</option>
-                    <option value="Festive & Wedding">Festive & Wedding</option>
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-medium text-zinc-300">
+                      Category *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCategoryInline(!showAddCategoryInline)}
+                      className="text-[11px] text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>{showAddCategoryInline ? 'Choose Existing' : '+ Custom Category'}</span>
+                    </button>
+                  </div>
+
+                  {showAddCategoryInline ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newCategoryInlineInput}
+                        onChange={(e) => setNewCategoryInlineInput(e.target.value)}
+                        placeholder="e.g. Lab Coats, KV Uniforms..."
+                        className="flex-1 px-3 py-2 bg-zinc-900 border border-amber-500/50 rounded-lg text-xs text-zinc-100 focus:outline-none focus:border-amber-400"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (newCategoryInlineInput.trim()) {
+                              handleAddCustomCategory(newCategoryInlineInput);
+                              setCategory(newCategoryInlineInput.trim());
+                              setNewCategoryInlineInput('');
+                              setShowAddCategoryInline(false);
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newCategoryInlineInput.trim()) {
+                            handleAddCustomCategory(newCategoryInlineInput);
+                            setCategory(newCategoryInlineInput.trim());
+                            setNewCategoryInlineInput('');
+                            setShowAddCategoryInline(false);
+                          }
+                        }}
+                        className="px-3 py-2 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold text-xs rounded-lg transition-colors cursor-pointer shrink-0"
+                      >
+                        Add & Select
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={category}
+                      onChange={(e) => {
+                        if (e.target.value === '__add_new__') {
+                          setShowAddCategoryInline(true);
+                        } else {
+                          setCategory(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                    >
+                      {availableCategories.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                      <option value="__add_new__" className="text-amber-400 font-semibold">
+                        ➕ + Create New Category...
+                      </option>
+                    </select>
+                  )}
                 </div>
 
                 <div>
@@ -950,11 +1109,113 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="max-w-2xl mx-auto space-y-8">
             <div className="border-b border-zinc-800 pb-4">
               <h2 className="font-serif text-2xl font-semibold text-zinc-100">
-                Storefront & Security Settings
+                Storefront & Category Settings
               </h2>
               <p className="text-xs text-zinc-400 mt-1">
-                Configure your WhatsApp contact number and manage your Admin Security Password.
+                Manage your garment categories, WhatsApp contact number, and Admin Security Password.
               </p>
+            </div>
+
+            {/* Custom Category Management Card */}
+            <div className="p-5 rounded-xl bg-zinc-900/80 border border-amber-500/30 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-amber-300 font-semibold text-sm">
+                  <Tags className="w-4 h-4" />
+                  <span>Garment Categories Manager</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResetDefaultCategories}
+                  className="text-[11px] text-zinc-400 hover:text-amber-300 flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Reset to JSB SONS standard garment categories"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset Defaults</span>
+                </button>
+              </div>
+
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Add, manage, and delete custom ready garment categories. Any category added here instantly syncs across all devices, appearing in the top navigation, filter pills, and product forms.
+              </p>
+
+              {categoryManagerNotice && (
+                <div
+                  className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
+                    categoryManagerNotice.type === 'success'
+                      ? 'bg-emerald-950/70 border border-emerald-500/40 text-emerald-300'
+                      : 'bg-rose-950/70 border border-rose-500/40 text-rose-300'
+                  }`}
+                >
+                  {categoryManagerNotice.type === 'success' ? (
+                    <Check className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{categoryManagerNotice.msg}</span>
+                </div>
+              )}
+
+              {/* Add New Category Input */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (newCategoryManagerInput.trim()) {
+                    const ok = handleAddCustomCategory(newCategoryManagerInput);
+                    if (ok) setNewCategoryManagerInput('');
+                  }
+                }}
+                className="flex gap-2"
+              >
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={newCategoryManagerInput}
+                    onChange={(e) => setNewCategoryManagerInput(e.target.value)}
+                    placeholder="Enter new category (e.g. Lab Coats, KV Uniforms, Winter Wear...)"
+                    className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Category</span>
+                </button>
+              </form>
+
+              {/* Category Pills List with product count & delete action */}
+              <div className="space-y-2 pt-2">
+                <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider block">
+                  Active Categories ({activeCategoriesList.length})
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {activeCategoriesList.map((cat) => {
+                    const count = products.filter((p) => p.category === cat).length;
+                    return (
+                      <div
+                        key={cat}
+                        className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80 group hover:border-zinc-700 transition-colors"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <p className="text-xs font-medium text-zinc-200 truncate">{cat}</p>
+                          <p className="text-[10px] text-zinc-500">
+                            {count} {count === 1 ? 'garment' : 'garments'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat)}
+                          className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors cursor-pointer shrink-0"
+                          title={`Delete "${cat}"`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* Admin Security Password Card */}
@@ -1180,25 +1441,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </label>
 
-                <label>
-                  <span className="mb-1 block text-xs font-medium text-zinc-300">Category</span>
-                  <select
-                    value={editingProduct.category}
-                    onChange={(e) =>
-                      setEditingProduct({
-                        ...editingProduct,
-                        category: e.target.value as Product['category'],
-                      })
-                    }
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
-                  >
-                    <option>Shirts</option>
-                    <option>Kurtas & Ethnic</option>
-                    <option>Jackets & Blazers</option>
-                    <option>Trousers & Pants</option>
-                    <option>Festive & Wedding</option>
-                  </select>
-                </label>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="block text-xs font-medium text-zinc-300">Category</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowEditAddCategory(!showEditAddCategory)}
+                      className="text-[11px] text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>{showEditAddCategory ? 'Choose Existing' : '+ Custom Category'}</span>
+                    </button>
+                  </div>
+                  {showEditAddCategory ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={editNewCategoryInput}
+                        onChange={(e) => setEditNewCategoryInput(e.target.value)}
+                        placeholder="e.g. Lab Coats, Winter..."
+                        className="flex-1 px-3 py-2 bg-zinc-900 border border-amber-500/50 rounded-lg text-xs text-zinc-100 focus:outline-none focus:border-amber-400"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (editNewCategoryInput.trim()) {
+                              handleAddCustomCategory(editNewCategoryInput);
+                              setEditingProduct({
+                                ...editingProduct,
+                                category: editNewCategoryInput.trim(),
+                              });
+                              setEditNewCategoryInput('');
+                              setShowEditAddCategory(false);
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (editNewCategoryInput.trim()) {
+                            handleAddCustomCategory(editNewCategoryInput);
+                            setEditingProduct({
+                              ...editingProduct,
+                              category: editNewCategoryInput.trim(),
+                            });
+                            setEditNewCategoryInput('');
+                            setShowEditAddCategory(false);
+                          }
+                        }}
+                        className="px-3 py-2 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold text-xs rounded-lg transition-colors cursor-pointer shrink-0"
+                      >
+                        Set
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={editingProduct.category}
+                      onChange={(e) => {
+                        if (e.target.value === '__add_new__') {
+                          setShowEditAddCategory(true);
+                        } else {
+                          setEditingProduct({
+                            ...editingProduct,
+                            category: e.target.value,
+                          });
+                        }
+                      }}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
+                    >
+                      {availableCategories.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                      <option value="__add_new__" className="text-amber-400 font-semibold">
+                        ➕ + Create New Category...
+                      </option>
+                    </select>
+                  )}
+                </div>
 
                 <label>
                   <span className="mb-1 block text-xs font-medium text-zinc-300">Price (₹)</span>
