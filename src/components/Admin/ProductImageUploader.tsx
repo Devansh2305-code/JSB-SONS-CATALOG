@@ -1,18 +1,24 @@
 import React, { useRef, useState } from 'react';
-import { Upload, X, Image as ImageIcon, Sparkles, Check, RefreshCw, Palette } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Sparkles, Check, RefreshCw, Palette, User, Shirt } from 'lucide-react';
 import { renderHangingGarment } from '../../services/hangingGarmentRenderer';
 import { uploadImageToSupabase, isSupabaseConfigured } from '../../services/supabase';
 import { extractColorsFromImage, ExtractedColor } from '../../utils/colorExtractor';
+import { generateVirtualTryOn } from '../../services/virtualTryOnService';
 
 interface ProductImageUploaderProps {
   images: string[];
   onChangeImages: (images: string[]) => void;
   hangingImageUrl?: string;
   onChangeHangingImage?: (url: string) => void;
+  modelTryOnUrl?: string;
+  onChangeModelTryOn?: (url: string) => void;
+  title?: string;
   category: string;
   color: string;
   colorHex: string;
   fabric: string;
+  modelType?: 'mannequin' | 'model-male' | 'model-female' | 'ghost-mannequin';
+  onChangeModelType?: (type: 'mannequin' | 'model-male' | 'model-female' | 'ghost-mannequin') => void;
   onAutoColorDetected?: (colorName: string, colorHex: string, palette: ExtractedColor[]) => void;
 }
 
@@ -21,16 +27,25 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
   onChangeImages,
   hangingImageUrl,
   onChangeHangingImage,
+  modelTryOnUrl,
+  onChangeModelTryOn,
+  title,
   category,
   color,
   colorHex,
   fabric,
+  modelType = 'mannequin',
+  onChangeModelType,
   onAutoColorDetected,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatingHanger, setGeneratingHanger] = useState(false);
+  const [generatingModel, setGeneratingModel] = useState(false);
+  const [selectedModelType, setSelectedModelType] = useState<
+    'mannequin' | 'model-male' | 'model-female' | 'ghost-mannequin'
+  >(modelType);
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
 
   // Resize and compress oversized images to preserve speed and prevent lag
@@ -166,6 +181,41 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
       console.error('Failed to generate hanging form:', err);
     } finally {
       setGeneratingHanger(false);
+    }
+  };
+
+  // Generate Virtual Model / Mannequin Try-On using Python + Gemini AI
+  const handleGenerateModelTryOn = async () => {
+    if (images.length === 0 || !onChangeModelTryOn) return;
+    setGeneratingModel(true);
+
+    try {
+      const primaryImage = images[0];
+      const result = await generateVirtualTryOn({
+        imageBase64: primaryImage,
+        title: title || `${color} ${category}`,
+        category,
+        color,
+        colorHex,
+        fabric,
+        modelType: selectedModelType,
+      });
+
+      if (result.success && result.imageUrl) {
+        onChangeModelTryOn(result.imageUrl);
+        if (onChangeModelType) onChangeModelType(selectedModelType);
+        setUploadNotice(
+          `✨ Virtual ${selectedModelType.replace('-', ' ')} try-on generated successfully!`
+        );
+      } else {
+        setUploadNotice(result.message || 'Model generation completed.');
+      }
+      setTimeout(() => setUploadNotice(null), 4000);
+    } catch (err: any) {
+      console.error('Failed to generate virtual model try-on:', err);
+      setUploadNotice('Failed to generate model try-on. Please try again.');
+    } finally {
+      setGeneratingModel(false);
     }
   };
 
@@ -312,7 +362,100 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
                 )}
               </div>
             )}
+
+            {/* Optional Virtual Model Try-On Preview */}
+            {modelTryOnUrl && (
+              <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-zinc-950 border border-emerald-500/50 group shadow">
+                <img
+                  src={modelTryOnUrl}
+                  alt="Virtual Model Try-On Preview"
+                  className="w-full h-full object-cover"
+                />
+                <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-zinc-950/90 text-emerald-300 border border-emerald-500/40 shadow">
+                  🧍 Model Try-On
+                </span>
+                {onChangeModelTryOn && (
+                  <button
+                    type="button"
+                    onClick={() => onChangeModelTryOn('')}
+                    className="absolute top-2 right-2 p-1 rounded-full bg-zinc-950/80 hover:bg-rose-950 text-zinc-300 hover:text-rose-300 border border-zinc-700 transition-colors cursor-pointer"
+                    title="Remove model try-on"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Virtual Model / Mannequin Try-On Action Box */}
+          {onChangeModelTryOn && (
+            <div className="p-3.5 rounded-lg bg-zinc-900/90 border border-amber-500/40 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-zinc-200 text-xs block">
+                      AI Virtual Model / Mannequin Try-On (Python + Gemini)
+                    </span>
+                    <span className="text-zinc-400 text-[11px]">
+                      {modelTryOnUrl
+                        ? 'Imaginary model try-on image active and displayed to catalog visitors.'
+                        : 'Generate an imaginary mannequin or fashion model trying on this garment.'}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateModelTryOn}
+                  disabled={generatingModel}
+                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-semibold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 shadow-sm active:scale-95"
+                >
+                  {generatingModel ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Generating Model Look...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{modelTryOnUrl ? 'Re-generate Model Look' : 'Generate Model Try-On'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Model Style Selector Pills */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-800/80">
+                <span className="text-[11px] text-zinc-400 font-medium">Model Style:</span>
+                {[
+                  { id: 'mannequin', label: '🧍 Tailor Mannequin' },
+                  { id: 'model-male', label: '👤 Male Model' },
+                  { id: 'model-female', label: '👩 Female Model' },
+                  { id: 'ghost-mannequin', label: '🧥 Ghost 3D' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedModelType(s.id as any);
+                      if (onChangeModelType) onChangeModelType(s.id as any);
+                    }}
+                    className={`px-2.5 py-1 text-[11px] rounded-md font-medium transition-colors cursor-pointer ${
+                      selectedModelType === s.id
+                        ? 'bg-amber-400/20 text-amber-300 border border-amber-500/50 shadow-sm font-semibold'
+                        : 'bg-zinc-950 text-zinc-400 border border-zinc-800 hover:text-zinc-200'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Hanging Form Generation Action */}
           {onChangeHangingImage && (

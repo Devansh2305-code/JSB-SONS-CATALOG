@@ -115,6 +115,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [sizes, setSizes] = useState<string>('38 (S), 40 (M), 42 (L), 44 (XL)');
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [uploadedHangingUrl, setUploadedHangingUrl] = useState<string>('');
+  const [uploadedModelTryOnUrl, setUploadedModelTryOnUrl] = useState<string>('');
+  const [productModelType, setProductModelType] = useState<'mannequin' | 'model-male' | 'model-female' | 'ghost-mannequin'>('mannequin');
   const [description, setDescription] = useState(
     'Ready garment from JSB SONS made with quality fabric and neat stitching.'
   );
@@ -249,7 +251,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       sizes: parsedSizes.length > 0 ? parsedSizes : ['38 (S)', '40 (M)', '42 (L)', '44 (XL)'],
       images: uploadedImages,
       hangingImageUrl: uploadedHangingUrl || undefined,
-      displayMode: uploadedHangingUrl ? 'hanging' : 'photo',
+      modelTryOnUrl: uploadedModelTryOnUrl || undefined,
+      modelType: productModelType,
+      displayMode: uploadedModelTryOnUrl ? 'model' : uploadedHangingUrl ? 'hanging' : 'photo',
       description: description.trim(),
       inStock: true,
       isFeatured: false,
@@ -265,6 +269,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTitle('');
     setUploadedImages([]);
     setUploadedHangingUrl('');
+    setUploadedModelTryOnUrl('');
+    setProductModelType('mannequin');
     setDetectedPalette([]);
     setPrice(2490);
   };
@@ -564,6 +570,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   }}
                   hangingImageUrl={uploadedHangingUrl}
                   onChangeHangingImage={setUploadedHangingUrl}
+                  modelTryOnUrl={uploadedModelTryOnUrl}
+                  onChangeModelTryOn={setUploadedModelTryOnUrl}
+                  title={title}
+                  modelType={productModelType}
+                  onChangeModelType={setProductModelType}
                   category={category}
                   color={color}
                   colorHex={colorHex}
@@ -1454,6 +1465,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 hangingImageUrl={editingProduct.hangingImageUrl}
                 onChangeHangingImage={(hangingImageUrl) =>
                   setEditingProduct({ ...editingProduct, hangingImageUrl, displayMode: 'hanging' })
+                }
+                modelTryOnUrl={editingProduct.modelTryOnUrl}
+                onChangeModelTryOn={(modelTryOnUrl) =>
+                  setEditingProduct({ ...editingProduct, modelTryOnUrl, displayMode: 'model' })
+                }
+                title={editingProduct.title}
+                modelType={editingProduct.modelType ?? 'mannequin'}
+                onChangeModelType={(modelType) =>
+                  setEditingProduct({ ...editingProduct, modelType })
                 }
                 category={editingProduct.category}
                 color={editingProduct.color}

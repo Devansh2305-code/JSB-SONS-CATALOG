@@ -14,7 +14,9 @@ export interface Product {
   sizes: string[];
   images: string[];
   hangingImageUrl?: string;
-  displayMode?: 'hanging' | 'photo';
+  modelTryOnUrl?: string;
+  modelType?: 'mannequin' | 'model-male' | 'model-female' | 'ghost-mannequin';
+  displayMode?: 'hanging' | 'photo' | 'model';
   collarStyle?: string;
   sleeveStyle?: string;
   description: string;
