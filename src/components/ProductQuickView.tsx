@@ -214,11 +214,6 @@ export const ProductQuickView: React.FC<ProductQuickViewProps> = ({
                       <span className="font-bold text-xl sm:text-2xl text-zinc-100 tabular-nums">
                         ₹{product.price.toLocaleString('en-IN')}
                       </span>
-                      {product.originalPrice && (
-                        <span className="text-xs text-zinc-500 line-through tabular-nums">
-                          ₹{product.originalPrice.toLocaleString('en-IN')}
-                        </span>
-                      )}
                       <span className="text-[11px] text-emerald-400 font-medium">
                         In Stock
                       </span>
@@ -247,7 +242,6 @@ export const ProductQuickView: React.FC<ProductQuickViewProps> = ({
                           <label className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-zinc-400">
                             Select Size
                           </label>
-                          <span className="text-[10px] text-zinc-400">Free Alteration Available</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5 sm:gap-2">
                           {product.sizes.map((sz) => (

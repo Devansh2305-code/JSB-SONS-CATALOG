@@ -285,9 +285,6 @@ export const Hero: React.FC<HeroProps> = ({ settings, onExploreClick }) => {
                       <span className="text-xs sm:text-sm font-bold text-amber-300">
                         ₹{activeItem.price.toLocaleString('en-IN')}
                       </span>
-                      <span className="text-[10px] sm:text-xs text-zinc-500 line-through">
-                        ₹{activeItem.originalPrice.toLocaleString('en-IN')}
-                      </span>
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-medium">
                         {activeItem.tag}
                       </span>

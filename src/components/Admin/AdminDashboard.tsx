@@ -688,18 +688,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <div>
                   <label className="block text-xs font-medium text-zinc-300 mb-1">
-                    Original Price (Optional strikethrough)
-                  </label>
-                  <input
-                    type="number"
-                    value={originalPrice}
-                    onChange={(e) => setOriginalPrice(Number(e.target.value))}
-                    className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
                     Fabric Composition
                   </label>
                   <input
@@ -1581,22 +1569,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     value={editingProduct.price}
                     onChange={(e) =>
                       setEditingProduct({ ...editingProduct, price: Number(e.target.value) })
-                    }
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
-                  />
-                </label>
-
-                <label>
-                  <span className="mb-1 block text-xs font-medium text-zinc-300">Original Price</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editingProduct.originalPrice || ''}
-                    onChange={(e) =>
-                      setEditingProduct({
-                        ...editingProduct,
-                        originalPrice: e.target.value ? Number(e.target.value) : undefined,
-                      })
                     }
                     className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-amber-400 focus:outline-none"
                   />

@@ -185,11 +185,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <span className="font-bold text-zinc-100 text-sm sm:text-base tabular-nums">
                 ₹{product.price.toLocaleString('en-IN')}
               </span>
-              {product.originalPrice && (
-                <span className="text-[10px] sm:text-xs text-zinc-500 line-through tabular-nums">
-                  ₹{product.originalPrice.toLocaleString('en-IN')}
-                </span>
-              )}
             </div>
           </div>
 

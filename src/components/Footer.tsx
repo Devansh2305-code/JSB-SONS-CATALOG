@@ -77,11 +77,6 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenAdmin }) => {
               </li>
               <li>
                 <a href="#contact-section" className="hover:text-amber-200 transition-colors">
-                  Free Fitting Alterations
-                </a>
-              </li>
-              <li>
-                <a href="#contact-section" className="hover:text-amber-200 transition-colors">
                   Fast Delivery Across India
                 </a>
               </li>

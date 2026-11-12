@@ -71,7 +71,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
             Visit Our Store or Message Us Directly.
           </h2>
           <p className="text-zinc-400 text-sm sm:text-base mt-3 leading-relaxed">
-            Whether you need free fitting adjustments, wedding group orders, or quick home delivery, our team is ready to help you online and in our shop.
+            Whether you need custom tailoring, home delivery, or want to check our latest collection, our team is ready to help you online and in our shop.
           </p>
         </div>
 
@@ -123,7 +123,6 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                 <div>
                   <h4 className="font-semibold text-zinc-200">Store Timings</h4>
                   <p className="text-zinc-400 mt-0.5">{settings.workingHours}</p>
-                  <p className="text-emerald-400 font-medium mt-0.5">Fitting Tailor Available at Store</p>
                 </div>
               </div>
 
@@ -133,26 +132,6 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                   <h4 className="font-semibold text-zinc-200">Phone Support</h4>
                   <p className="text-zinc-400 mt-0.5">{settings.displayPhone}</p>
                 </div>
-              </div>
-
-              <div className="flex items-start gap-3 pt-3 border-t border-zinc-800/80">
-                <Mail className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-semibold text-zinc-200">Email Address</h4>
-                  <p className="text-zinc-400 mt-0.5">{settings.email}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Store Perks */}
-            <div className="grid grid-cols-2 gap-3 text-xs text-zinc-400">
-              <div className="p-3 bg-zinc-900/40 rounded border border-zinc-800/60 flex items-center gap-2">
-                <Scissors className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Free Fitting & Alteration</span>
-              </div>
-              <div className="p-3 bg-zinc-900/40 rounded border border-zinc-800/60 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Wedding Group & Bulk Discounts</span>
               </div>
             </div>
           </div>
@@ -244,7 +223,6 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                       <option value="Ready Linen & Cotton Shirts">Ready Linen & Cotton Shirts</option>
                       <option value="Bandhgala & Blazers">Bandhgala & Blazers</option>
                       <option value="Tailored Trousers & Pants">Tailored Trousers & Pants</option>
-                      <option value="Wedding Group Bulk Order">Wedding Group Bulk Order</option>
                       <option value="Size & Fitting Help">Size & Fitting Help</option>
                     </select>
                   </div>
