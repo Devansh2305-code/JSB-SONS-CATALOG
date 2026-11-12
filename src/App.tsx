@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Search,
-  Filter,
   Sparkles,
-  ArrowUpDown,
-  Layers,
-  ChevronRight,
-  ShieldAlert,
   ArrowRight,
   MessageCircle,
+  Scissors,
+  Shirt,
+  Building2,
+  MapPin,
+  X,
 } from 'lucide-react';
 import { Product, StoreSettings, EnquiryItem } from './types';
 import { INITIAL_PRODUCTS, DEFAULT_STORE_SETTINGS, DEFAULT_CATEGORIES } from './data/initialProducts';
+import { resolveAssetUrl } from './assets/images';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { ProductCard } from './components/ProductCard';
@@ -39,23 +40,43 @@ import {
   seedInitialProductsIfEmpty,
 } from './services/supabase';
 
+const normalizeProduct = (product: Product): Product => ({
+  ...product,
+  images: (product.images || []).map(resolveAssetUrl),
+  hangingImageUrl: resolveAssetUrl(product.hangingImageUrl) || undefined,
+  modelTryOnUrl: resolveAssetUrl(product.modelTryOnUrl) || undefined,
+});
+
+const normalizeSettings = (value?: Partial<StoreSettings> | null): StoreSettings => ({
+  ...DEFAULT_STORE_SETTINGS,
+  ...(value || {}),
+  announcementEnabled: value?.announcementEnabled !== false,
+  announcementSpeed: value?.announcementSpeed || 'normal',
+  categories:
+    value?.categories && value.categories.length > 0
+      ? value.categories
+      : DEFAULT_CATEGORIES,
+});
+
+const normalizeProducts = (list: Product[]): Product[] => list.map(normalizeProduct);
+
 export default function App() {
   // Store products in state with localStorage persistence as local offline fallback
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem('jsb_products');
-      if (saved) return JSON.parse(saved);
+      if (saved) return normalizeProducts(JSON.parse(saved));
     } catch (e) {
       console.warn('Could not read stored products', e);
     }
-    return INITIAL_PRODUCTS;
+    return normalizeProducts(INITIAL_PRODUCTS);
   });
 
   // Store settings in state with localStorage persistence
   const [settings, setSettings] = useState<StoreSettings>(() => {
     try {
       const saved = localStorage.getItem('jsb_settings');
-      if (saved) return JSON.parse(saved);
+      if (saved) return normalizeSettings(JSON.parse(saved));
     } catch (e) {
       console.warn('Could not read stored settings', e);
     }
@@ -104,20 +125,20 @@ export default function App() {
 
         if (!isCancelled) {
           if (cloudProducts && cloudProducts.length > 0) {
-            setProducts(cloudProducts);
+            setProducts(normalizeProducts(cloudProducts));
           } else if (cloudProducts && cloudProducts.length === 0) {
             // Empty database table -> auto-seed initial products so all users share them
             await seedInitialProductsIfEmpty(INITIAL_PRODUCTS);
             const seeded = await fetchProductsFromSupabase();
             if (seeded && seeded.length > 0 && !isCancelled) {
-              setProducts(seeded);
+              setProducts(normalizeProducts(seeded));
             }
           }
         }
 
         const cloudSettings = await fetchStoreSettingsFromSupabase();
         if (!isCancelled && cloudSettings) {
-          setSettings(cloudSettings);
+          setSettings(normalizeSettings(cloudSettings));
         }
       } catch (err) {
         console.warn('Database initial load error, using local cache:', err);
@@ -129,7 +150,7 @@ export default function App() {
         try {
           const fresh = await fetchProductsFromSupabase();
           if (fresh && !isCancelled) {
-            setProducts(fresh);
+            setProducts(normalizeProducts(fresh));
           }
         } catch (e) {
           console.warn('Realtime product update fetch error:', e);
@@ -138,7 +159,7 @@ export default function App() {
 
       unsubscribeSettings = subscribeToStoreSettingsChanges((newSettings) => {
         if (!isCancelled && newSettings) {
-          setSettings(newSettings);
+          setSettings(normalizeSettings(newSettings));
         }
       });
     };
@@ -150,7 +171,7 @@ export default function App() {
       if (isSupabaseConfigured()) {
         const fresh = await fetchProductsFromSupabase();
         if (fresh && fresh.length > 0 && !isCancelled) {
-          setProducts(fresh);
+          setProducts(normalizeProducts(fresh));
         }
       }
     };
@@ -324,10 +345,16 @@ export default function App() {
   };
 
   const handleUpdateSettings = (newSettings: StoreSettings) => {
-    setSettings(newSettings);
+    const normalized = normalizeSettings(newSettings);
+    setSettings(normalized);
     if (isSupabaseConfigured()) {
-      saveStoreSettingsToSupabase(newSettings).catch(console.error);
+      saveStoreSettingsToSupabase(normalized).catch(console.error);
     }
+  };
+
+  const handleSelectCategory = (category: string) => {
+    setSelectedCategory(category);
+    document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleOpenAdmin = () => {
@@ -416,144 +443,225 @@ export default function App() {
     );
   }
 
-  // Otherwise render Luxury Customer Storefront
+  const whatsappBase = `https://wa.me/${settings.whatsappNumber.replace(/[^0-9]/g, '')}`;
+  const servicePromises = [
+    {
+      icon: Scissors,
+      title: 'Cut & finished in-house',
+      caption: 'Neat seams and finishes that last.',
+    },
+    {
+      icon: Shirt,
+      title: 'Every size, ready',
+      caption: 'School fits to XXL, stocked now.',
+    },
+    {
+      icon: Building2,
+      title: 'Bulk & corporate',
+      caption: '25+ pieces with logo printing.',
+    },
+    {
+      icon: MessageCircle,
+      title: 'WhatsApp-first service',
+      caption: 'One tap to our shop counter.',
+    },
+  ];
+
+  // Otherwise render the atelier storefront
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-amber-500/20 selection:text-amber-200">
-      {/* Top Header */}
+    <div className="flex min-h-screen flex-col overflow-x-clip bg-paper font-sans text-ink">
       <Header
         settings={settings}
         enquiryCount={enquiryItems.length}
         onOpenEnquiryDrawer={() => setIsEnquiryDrawerOpen(true)}
         activeCategory={selectedCategory}
-        onSelectCategory={(cat) => setSelectedCategory(cat)}
+        onSelectCategory={handleSelectCategory}
         categories={categories}
       />
 
-      {/* Main Campaign Hero */}
       <Hero
         settings={settings}
         onExploreClick={() => {
           const el = document.getElementById('catalog-section');
           el?.scrollIntoView({ behavior: 'smooth' });
         }}
+        onSelectCategory={handleSelectCategory}
       />
 
-      {/* Product Catalog Section */}
-      <main id="catalog-section" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Catalog Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 sm:gap-4 mb-5 sm:mb-8">
-          <div>
-            <div className="flex items-center gap-2 text-[10px] sm:text-xs uppercase tracking-widest text-amber-400 font-semibold mb-1">
-              <span>READY CLOTHES COLLECTION</span>
-              <span aria-hidden="true">·</span>
-              <span>{sortedProducts.length} PRODUCTS</span>
+      {/* Atelier promises */}
+      <section className="border-y border-line/70 bg-cream/70">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-px px-4 py-5 sm:px-6 lg:grid-cols-4 lg:px-8">
+          {servicePromises.map((promise) => (
+            <div key={promise.title} className="flex items-start gap-3 px-2 py-3 sm:px-4">
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brass/30 bg-paper text-brass">
+                <promise.icon className="h-4 w-4" strokeWidth={1.7} />
+              </span>
+              <div>
+                <p className="font-serif text-[13px] font-semibold leading-tight text-ink sm:text-sm">
+                  {promise.title}
+                </p>
+                <p className="mt-0.5 text-[10px] leading-snug text-ink-soft sm:text-[11px]">
+                  {promise.caption}
+                </p>
+              </div>
             </div>
-            <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-zinc-100 tracking-tight">
-              Garments Catalog
+          ))}
+        </div>
+      </section>
+
+      {/* Product Catalog Section */}
+      <main
+        id="catalog-section"
+        className="mx-auto w-full max-w-7xl flex-1 px-4 pb-16 pt-12 sm:px-6 sm:pt-16 lg:px-8"
+      >
+        <div className="mb-8 flex flex-col justify-between gap-6 border-b border-line/70 pb-8 lg:flex-row lg:items-end">
+          <div className="max-w-2xl">
+            <span className="eyebrow">The Collection</span>
+            <h2 className="mt-4 font-display text-3xl font-medium leading-[1.02] tracking-[-0.03em] text-ink text-balance sm:text-4xl lg:text-[3.1rem]">
+              Readymade, <span className="italic text-wine">exceptionally</span> made.
             </h2>
+            <p className="mt-3 max-w-xl text-xs leading-relaxed text-ink-soft sm:text-sm">
+              Tap any piece to inspect the fabric, fit and sizes — then send a single-tap
+              enquiry to our shop on WhatsApp.
+            </p>
           </div>
 
-          {/* Search Input - Clean & Full width on phone */}
-          <div className="relative w-full md:w-80">
-            <Search className="w-4 h-4 absolute left-3.5 top-3 text-zinc-400" />
-            <input
-              type="text"
-              placeholder="Search shirts, kurtas, jackets..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-12 py-2 sm:py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-400/60"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-2.5 text-zinc-400 hover:text-zinc-200 text-xs py-0.5 px-1.5"
-              >
-                Clear
-              </button>
-            )}
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:w-auto">
+            <div className="relative w-full sm:w-72 lg:w-80">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft/70" />
+              <input
+                type="text"
+                placeholder="Search shirts, kurtas, jackets..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="field rounded-full py-3 pl-11 pr-11 text-xs sm:text-sm"
+                aria-label="Search the collection"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="press absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-paper-deep/60 hover:text-ink"
+                  aria-label="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            <a
+              href="#contact-section"
+              className="press group inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border border-wine/25 bg-wine/[0.04] px-5 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-wine transition-colors hover:bg-wine hover:text-cream"
+            >
+              <span>Bulk quote</span>
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </a>
           </div>
         </div>
 
-        {/* Filter Controls Bar - Mobile horizontal scrollable tabs */}
-        <div className="flex flex-col gap-3 mb-6 pb-4 border-b border-zinc-800/80">
-          {/* Category Tabs - Smooth swipe with touch padding on phone */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 scrollbar-none">
+        {/* Filters */}
+        <div className="mb-7 flex flex-col gap-4">
+          <div className="scrollbar-none -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 lg:flex-wrap lg:overflow-visible">
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+                className={`press shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.1em] transition-all sm:text-[11px] ${
                   selectedCategory === cat
-                    ? 'bg-zinc-100 text-zinc-950 shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200 bg-zinc-900/60 border border-zinc-800/80'
+                    ? 'border-ink bg-ink text-cream shadow-sm'
+                    : 'border-line/80 bg-cream/60 text-ink-soft hover:border-ink/30 hover:text-ink'
                 }`}
+                aria-pressed={selectedCategory === cat}
               >
                 {cat}
               </button>
             ))}
           </div>
 
-          {/* Secondary Filters - 2 columns on phone for perfect thumb ergonomics */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 text-xs">
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3">
-              {/* Color filter */}
-              <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5">
-                <span className="text-zinc-400 text-[11px] shrink-0">Color:</span>
+          <div className="flex flex-col gap-3 border-t border-line/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex items-center gap-2 rounded-full border border-line/80 bg-cream/60 px-3.5 py-2">
+                <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-ink-soft">
+                  Colour
+                </span>
                 <select
                   value={selectedColor}
                   onChange={(e) => setSelectedColor(e.target.value)}
-                  className="bg-transparent text-zinc-200 text-xs focus:outline-none w-full"
+                  className="cursor-pointer bg-transparent text-xs font-medium text-ink focus:outline-none"
+                  aria-label="Filter by colour"
                 >
-                  <option value="All" className="bg-zinc-900">All</option>
+                  <option value="All">All colours</option>
                   {uniqueColors.map((c) => (
-                    <option key={c} value={c} className="bg-zinc-900">
+                    <option key={c} value={c}>
                       {c}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Sort Dropdown */}
-              <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5">
-                <span className="text-zinc-400 text-[11px] shrink-0">Sort:</span>
+              <div className="flex items-center gap-2 rounded-full border border-line/80 bg-cream/60 px-3.5 py-2">
+                <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-ink-soft">
+                  Sort
+                </span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="bg-transparent text-zinc-200 text-xs focus:outline-none w-full"
+                  className="cursor-pointer bg-transparent text-xs font-medium text-ink focus:outline-none"
+                  aria-label="Sort products"
                 >
-                  <option value="featured" className="bg-zinc-900">Featured</option>
-                  <option value="price-asc" className="bg-zinc-900">Price: Low</option>
-                  <option value="price-desc" className="bg-zinc-900">Price: High</option>
+                  <option value="featured">Featured first</option>
+                  <option value="price-asc">Price: low to high</option>
+                  <option value="price-desc">Price: high to low</option>
                 </select>
               </div>
+
+              <button
+                onClick={() => setOnlyAiSliced(!onlyAiSliced)}
+                className={`press inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.1em] transition-colors ${
+                  onlyAiSliced
+                    ? 'border-brass/60 bg-brass/10 text-wine'
+                    : 'border-line/80 bg-cream/60 text-ink-soft hover:border-brass/50 hover:text-ink'
+                }`}
+                aria-pressed={onlyAiSliced}
+              >
+                <Sparkles className="h-3.5 w-3.5 text-brass" />
+                <span>Auto-separated</span>
+              </button>
+
+              {(selectedCategory !== 'All' ||
+                selectedColor !== 'All' ||
+                searchQuery ||
+                onlyAiSliced) && (
+                <button
+                  onClick={() => {
+                    setSelectedCategory('All');
+                    setSelectedColor('All');
+                    setSearchQuery('');
+                    setOnlyAiSliced(false);
+                  }}
+                  className="px-2 text-[10px] font-bold uppercase tracking-[0.1em] text-ink-soft underline decoration-line underline-offset-4 transition-colors hover:text-wine"
+                >
+                  Reset
+                </button>
+              )}
             </div>
 
-            {/* Auto-Separated toggle */}
-            <button
-              onClick={() => setOnlyAiSliced(!onlyAiSliced)}
-              className={`px-3 py-1.5 rounded border transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-xs ${
-                onlyAiSliced
-                  ? 'bg-amber-400/10 text-amber-300 border-amber-500/40 font-semibold'
-                  : 'text-zinc-400 border-zinc-800 hover:text-zinc-200 bg-zinc-900/40'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Show Auto-Separated Clothes</span>
-            </button>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-soft/80">
+              Showing {sortedProducts.length} of {products.length} pieces
+            </p>
           </div>
         </div>
 
-        {/* Product Cards Grid - Clean 2-column grid on mobile! */}
+        {/* Product grid */}
         {sortedProducts.length === 0 ? (
-          <div className="py-16 text-center flex flex-col items-center">
-            <div className="w-14 h-14 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-3">
-              <Search className="w-6 h-6" />
+          <div className="flex flex-col items-center py-20 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-line bg-cream text-ink-soft">
+              <Search className="h-6 w-6" />
             </div>
-            <h3 className="font-serif text-lg font-semibold text-zinc-200">
-              No matching clothes found
+            <h3 className="font-display text-2xl font-medium text-ink">
+              Nothing matching that search
             </h3>
-            <p className="text-xs text-zinc-400 mt-1 max-w-sm">
-              Try resetting your category or color filter.
+            <p className="mt-2 max-w-sm text-xs text-ink-soft">
+              Try a different colour, category or clear your filters to see the full collection.
             </p>
             <button
               onClick={() => {
@@ -562,13 +670,13 @@ export default function App() {
                 setSearchQuery('');
                 setOnlyAiSliced(false);
               }}
-              className="mt-4 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded transition-colors cursor-pointer"
+              className="press mt-6 rounded-full bg-ink px-5 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-cream transition-colors hover:bg-wine"
             >
-              Reset Filters
+              Reset filters
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-6">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
             {sortedProducts.map((product) => {
               const isBagged = enquiryItems.some(
                 (item) => item.product.id === product.id
@@ -586,19 +694,60 @@ export default function App() {
             })}
           </div>
         )}
+
+        {/* Closing CTA */}
+        <div className="relative mt-14 overflow-hidden rounded-[2rem] bg-ink text-cream">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-brass/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-32 -left-16 h-72 w-72 rounded-full bg-wine/40 blur-3xl" />
+          <div className="relative flex flex-col gap-6 p-7 sm:flex-row sm:items-center sm:justify-between sm:p-10">
+            <div className="max-w-xl">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brass-soft">
+                Need a size we don't have?
+              </span>
+              <h3 className="mt-2 font-display text-2xl font-medium leading-tight text-cream sm:text-3xl">
+                Tell us what you need. We restock fast.
+              </h3>
+              <p className="mt-2 text-xs leading-relaxed text-cream/65 sm:text-sm">
+                School lists, corporate uniforms, wedding parties or single pieces — message
+                the shop with your size and timeline.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2.5 sm:flex-row">
+              <a
+                href={`${whatsappBase}?text=${encodeURIComponent(
+                  'Hello JSB SONS, I would like to request an item / size. Details: '
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="press inline-flex items-center justify-center gap-2 rounded-full bg-brass-soft px-5 py-3.5 text-[11px] font-bold uppercase tracking-[0.12em] text-ink transition-colors hover:bg-cream"
+              >
+                <MessageCircle className="h-4 w-4" />
+                <span>Message the shop</span>
+              </a>
+              <a
+                href="#contact-section"
+                className="press inline-flex items-center justify-center gap-2 rounded-full border border-cream/25 px-5 py-3.5 text-[11px] font-bold uppercase tracking-[0.12em] text-cream transition-colors hover:border-cream/60"
+              >
+                <MapPin className="h-4 w-4" />
+                <span>Visit store</span>
+              </a>
+            </div>
+          </div>
+        </div>
       </main>
 
-      {/* Floating 1-Tap WhatsApp Contact Button on Mobile */}
+      {/* Floating WhatsApp CTA */}
       <a
-        href={`https://wa.me/${settings.whatsappNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+        href={`${whatsappBase}?text=${encodeURIComponent(
           'Hello JSB SONS, I am browsing your catalog and would like to ask a question.'
         )}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-5 right-4 z-40 sm:hidden w-12 h-12 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 rounded-full flex items-center justify-center shadow-2xl border-2 border-zinc-900 active:scale-90 transition-transform"
-        title="Instant WhatsApp Support"
+        className="press animate-pulse-ring fixed bottom-5 right-4 z-40 flex items-center gap-2 rounded-full border border-cream/15 bg-forest px-4 py-3.5 text-[11px] font-bold uppercase tracking-[0.12em] text-cream shadow-[0_18px_40px_-16px_rgba(22,58,45,0.9)] sm:hidden"
+        aria-label="Chat with JSB SONS on WhatsApp"
       >
-        <MessageCircle className="w-6 h-6 fill-zinc-950/20" />
+        <MessageCircle className="h-5 w-5" />
+        <span>Chat with us</span>
       </a>
 
       {/* Contact & Enquiry Section at the bottom of the page */}

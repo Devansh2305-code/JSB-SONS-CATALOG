@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Layers,
   PlusCircle,
@@ -27,10 +27,16 @@ import {
   Plus,
   FolderPlus,
   RotateCcw,
+  Clock,
+  Megaphone,
 } from 'lucide-react';
 import { Product, StoreSettings } from '../../types';
 import { RawGarmentSlicer } from './RawGarmentSlicer';
 import { ProductImageUploader } from './ProductImageUploader';
+import {
+  AnnouncementMarquee,
+  parseAnnouncementMessages,
+} from '../AnnouncementMarquee';
 import {
   getStoredAdminPassword,
   setStoredAdminPassword,
@@ -116,6 +122,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [uploadedHangingUrl, setUploadedHangingUrl] = useState<string>('');
   const [uploadedModelTryOnUrl, setUploadedModelTryOnUrl] = useState<string>('');
+  const [uploadedIsStudioClean, setUploadedIsStudioClean] = useState(false);
   const [productModelType, setProductModelType] = useState<'mannequin' | 'model-male' | 'model-female' | 'ghost-mannequin'>('mannequin');
   const [description, setDescription] = useState(
     'Ready garment from JSB SONS made with quality fabric and neat stitching.'
@@ -126,6 +133,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Settings Form State
   const [tempSettings, setTempSettings] = useState<StoreSettings>(settings);
   const [settingsSavedAlert, setSettingsSavedAlert] = useState(false);
+
+  // Keep the settings form in sync when store settings arrive from Supabase
+  // (first load, realtime refresh or another admin device).
+  useEffect(() => {
+    setTempSettings(settings);
+  }, [settings]);
 
   // Admin Password Customization State
   const [currentPasswordInput, setCurrentPasswordInput] = useState('');
@@ -253,7 +266,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       hangingImageUrl: uploadedHangingUrl || undefined,
       modelTryOnUrl: uploadedModelTryOnUrl || undefined,
       modelType: productModelType,
-      displayMode: uploadedModelTryOnUrl ? 'model' : uploadedHangingUrl ? 'hanging' : 'photo',
+      displayMode: uploadedModelTryOnUrl
+        ? 'model'
+        : uploadedHangingUrl
+          ? 'hanging'
+          : uploadedIsStudioClean
+            ? 'studio'
+            : 'photo',
       description: description.trim(),
       inStock: true,
       isFeatured: false,
@@ -270,6 +289,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setUploadedImages([]);
     setUploadedHangingUrl('');
     setUploadedModelTryOnUrl('');
+    setUploadedIsStudioClean(false);
     setProductModelType('mannequin');
     setDetectedPalette([]);
     setPrice(2490);
@@ -426,7 +446,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 Store Admin
               </span>
             </h1>
-            <p className="text-[10px] sm:text-[11px] text-zinc-400 hidden xs:block">
+            <p className="text-[10px] sm:text-[11px] text-zinc-400 hidden sm:block">
               Products, Photos, Stock, & Cloud Database
             </p>
           </div>
@@ -578,9 +598,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   category={category}
                   color={color}
                   colorHex={colorHex}
-                  fabric={fabric}
-                  onAutoColorDetected={handleAutoColorDetected}
-                />
+                   fabric={fabric}
+                   onAutoColorDetected={handleAutoColorDetected}
+                   onStudioCleanChange={setUploadedIsStudioClean}
+                 />
               </div>
 
               {/* Garment Details Grid */}
@@ -1389,16 +1410,104 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div>
                 <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  Announcement Bar Notice
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-amber-400" />
+                    <span>Shop Timings (shown on the website)</span>
+                  </span>
                 </label>
                 <input
                   type="text"
+                  value={tempSettings.workingHours}
+                  onChange={(e) =>
+                    setTempSettings({ ...tempSettings, workingHours: e.target.value })
+                  }
+                  placeholder="e.g. Mon – Sat: 9:00 AM – 8:30 PM · Sun: 10:00 AM – 2:00 PM"
+                  className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                />
+                <p className="text-[11px] text-zinc-500 mt-1">
+                  Appears in the footer, contact section and visit-store details. Use a pipe
+                  ( | ) to put Sunday or holiday timings on a new line.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-200">
+                      <Megaphone className="h-3.5 w-3.5 text-amber-400" />
+                      <span>Moving announcement strip</span>
+                    </label>
+                    <p className="mt-1 text-[11px] text-zinc-500">
+                      Separate messages with a pipe ( | ) or a new line. Each becomes a moving
+                      highlight at the very top of the shop.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 shrink-0 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tempSettings.announcementEnabled !== false}
+                      onChange={(e) =>
+                        setTempSettings({
+                          ...tempSettings,
+                          announcementEnabled: e.target.checked,
+                        })
+                      }
+                      className="h-4 w-4 accent-amber-400"
+                    />
+                    <span className="text-[11px] font-medium text-zinc-300">
+                      Show on storefront
+                    </span>
+                  </label>
+                </div>
+
+                <textarea
+                  rows={3}
                   value={tempSettings.announcement}
                   onChange={(e) =>
                     setTempSettings({ ...tempSettings, announcement: e.target.value })
                   }
-                  className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                  placeholder={"Diwali collection is live | Bulk school uniform orders open | Visit us Mon – Sat, 9 AM – 8:30 PM"}
+                  className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-100 focus:outline-none focus:border-amber-400 leading-relaxed"
                 />
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] font-medium text-zinc-400">
+                      Scroll speed
+                    </label>
+                    <select
+                      value={tempSettings.announcementSpeed || 'normal'}
+                      onChange={(e) =>
+                        setTempSettings({
+                          ...tempSettings,
+                          announcementSpeed: e.target.value as StoreSettings['announcementSpeed'],
+                        })
+                      }
+                      className="rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-100 focus:border-amber-400 focus:outline-none"
+                    >
+                      <option value="slow">Slow</option>
+                      <option value="normal">Normal</option>
+                      <option value="fast">Fast</option>
+                    </select>
+                  </div>
+                  <span className="text-[10px] text-zinc-500">
+                    {parseAnnouncementMessages(tempSettings.announcement).length} message
+                    {parseAnnouncementMessages(tempSettings.announcement).length === 1 ? '' : 's'} ready
+                  </span>
+                </div>
+
+                <div className="overflow-hidden rounded-lg border border-zinc-800">
+                  <div className="border-b border-zinc-800 bg-zinc-950 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
+                    Live preview
+                  </div>
+                  {parseAnnouncementMessages(tempSettings.announcement).length > 0 ? (
+                    <AnnouncementMarquee settings={tempSettings} preview />
+                  ) : (
+                    <p className="bg-ink px-3 py-2.5 text-[10px] text-cream/50">
+                      Type a message to preview the moving strip.
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="pt-4 border-t border-zinc-800 flex justify-end">
@@ -1467,6 +1576,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 color={editingProduct.color}
                 colorHex={editingProduct.colorHex}
                 fabric={editingProduct.fabric}
+                onStudioCleanChange={(isStudioClean) =>
+                  setEditingProduct((prev) =>
+                    prev
+                      ? { ...prev, displayMode: isStudioClean ? 'studio' : prev.displayMode }
+                      : prev
+                  )
+                }
               />
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

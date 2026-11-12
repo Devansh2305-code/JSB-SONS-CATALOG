@@ -16,7 +16,7 @@ export interface Product {
   hangingImageUrl?: string;
   modelTryOnUrl?: string;
   modelType?: 'mannequin' | 'model-male' | 'model-female' | 'ghost-mannequin';
-  displayMode?: 'hanging' | 'photo' | 'model';
+  displayMode?: 'hanging' | 'photo' | 'model' | 'studio';
   collarStyle?: string;
   sleeveStyle?: string;
   description: string;
@@ -65,6 +65,8 @@ export interface StoreSettings {
   city: string;
   currency: string;
   announcement: string;
+  announcementEnabled?: boolean;
+  announcementSpeed?: 'slow' | 'normal' | 'fast';
   workingHours: string;
   defaultEnquiryMessage: string;
   categories?: string[];

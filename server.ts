@@ -365,6 +365,77 @@ app.post('/api/ai/virtual-tryon', async (req: Request, res: Response) => {
   }
 });
 
+// Endpoint: Gemini studio clean-up — removes the photo background and returns the
+// garment on a pure white catalogue background while preserving fabric detail.
+app.post('/api/ai/clean-product-image', async (req: Request, res: Response) => {
+  try {
+    const {
+      imageBase64,
+      mimeType = 'image/jpeg',
+      title = 'ready garment',
+      category = 'clothing',
+      fabric = 'premium fabric',
+    } = req.body;
+
+    if (!imageBase64) {
+      return res.status(400).json({ error: 'imageBase64 is required.' });
+    }
+
+    if (!ai) {
+      return res.status(503).json({
+        error: 'Gemini API Key is not configured on the server.',
+      });
+    }
+
+    const base64Data = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '');
+
+    // Keep this prompt compact: one image-editing pass, no retries, to conserve API credits.
+    const prompt = `Edit this ${category} product photo for a high-end retail catalogue. Remove the entire existing background and replace it with pure solid white (#FFFFFF). Keep the ${title} exactly the same product: preserve its true colour, fabric weave, texture, stitching, buttons, collar shape, folds and every detail. Isolate the full garment cleanly, centred, with an even margin, no mannequin, no hanger, no hands, no props, no text, no watermark and no harsh shadow. Professional e-commerce studio lighting with a very soft natural contact shadow. Sharp fabric detail, true-to-life colour, clean premium vision.`;
+
+    const imgResponse = await ai.models.generateContent({
+      model: 'gemini-3.1-flash-lite-image',
+      contents: {
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: mimeType || 'image/jpeg',
+              data: base64Data,
+            },
+          },
+        ],
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: '3:4',
+        },
+      },
+    });
+
+    for (const part of imgResponse.candidates?.[0]?.content?.parts ?? []) {
+      if (part.inlineData?.data) {
+        const outMime = part.inlineData.mimeType || 'image/png';
+        return res.json({
+          success: true,
+          imageUrl: `data:${outMime};base64,${part.inlineData.data}`,
+          fabric,
+        });
+      }
+    }
+
+    return res.status(502).json({
+      error: 'Gemini did not return a cleaned image. Please try again or use the original photo.',
+    });
+  } catch (error: any) {
+    console.error('Error in /api/ai/clean-product-image:', error);
+    return res.status(500).json({
+      error:
+        error.message ||
+        'Gemini could not clean this image. Please try a clearer garment photo.',
+    });
+  }
+});
+
 // Public client configuration endpoint (provides shared Supabase credentials across all devices)
 app.get('/api/config', (_req, res) => {
   res.json({

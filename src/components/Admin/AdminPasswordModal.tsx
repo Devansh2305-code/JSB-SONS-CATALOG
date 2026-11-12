@@ -41,7 +41,6 @@ export function resetStoredAdminPassword(): void {
 export function verifyAdminPassword(entered: string): boolean {
   const targetPassword = getStoredAdminPassword();
   const trimmed = entered.trim();
-  // Validates configured password OR master recovery fallback 'jsb2025'
   return trimmed === targetPassword.trim() || trimmed === 'jsb2025';
 }
 
@@ -62,7 +61,6 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
 
     if (verifyAdminPassword(password)) {
       setIsSubmitting(true);
-      // Store session
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('jsb_admin_authenticated', 'true');
       }
@@ -83,67 +81,61 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-black/85 backdrop-blur-md"
+          className="fixed inset-0 bg-ink/65 backdrop-blur-md"
         />
 
-        {/* Modal Card */}
         <motion.div
-          initial={{ scale: 0.95, opacity: 0, y: 10 }}
+          initial={{ scale: 0.96, opacity: 0, y: 12 }}
           animate={{
             scale: 1,
             opacity: 1,
             y: 0,
             x: shake ? [-10, 10, -8, 8, -4, 4, 0] : 0,
           }}
-          exit={{ scale: 0.95, opacity: 0, y: 10 }}
-          transition={{ duration: 0.2 }}
-          className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-10 p-6 sm:p-7"
+          exit={{ scale: 0.96, opacity: 0, y: 12 }}
+          transition={{ duration: 0.22 }}
+          className="relative z-10 w-full max-w-md overflow-hidden rounded-[1.75rem] border border-line/80 bg-paper p-6 shadow-2xl sm:p-7"
         >
-          {/* Top accent line */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600" />
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-wine via-brass to-forest" />
 
-          {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1.5 rounded-full text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors cursor-pointer"
+            className="press absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-line bg-cream text-ink-soft transition-colors hover:text-ink"
             aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="h-4 w-4" />
           </button>
 
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400">
-              <KeyRound className="w-5 h-5" />
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full border border-brass/30 bg-cream text-brass">
+              <KeyRound className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-serif text-lg font-bold text-zinc-100">
-                Owner Access Verification
-              </h3>
-              <p className="text-xs text-zinc-400">
-                JSB SONS Protected Admin Dashboard
+              <h3 className="font-display text-xl font-semibold text-ink">Owner access</h3>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
+                JSB SONS admin dashboard
               </p>
             </div>
           </div>
 
-          <p className="text-xs text-zinc-300 mb-5 leading-relaxed">
-            Enter the store management password to add products, adjust stock, or upload bulk garment photos.
+          <p className="mb-5 text-xs leading-relaxed text-ink-soft">
+            Enter the store management password to add products, adjust stock, clean photos
+            or update store settings.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-                Admin Password
+              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
+                Admin password
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-500">
-                  <Lock className="w-4 h-4" />
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-ink-soft/60">
+                  <Lock className="h-4 w-4" />
                 </div>
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -155,50 +147,45 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
                     setPassword(e.target.value);
                     if (errorMsg) setErrorMsg('');
                   }}
-                  className={`w-full pl-9 pr-10 py-2.5 bg-zinc-950 border rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none transition-colors ${
-                    errorMsg
-                      ? 'border-rose-500/80 focus:border-rose-500'
-                      : 'border-zinc-800 focus:border-amber-400/80'
+                  className={`field py-3 pl-10 pr-11 text-sm ${
+                    errorMsg ? 'border-wine/70' : ''
                   }`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-ink-soft transition-colors hover:text-ink"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
 
               {errorMsg && (
-                <p className="text-[11px] text-rose-400 mt-1.5 flex items-center gap-1 font-medium">
-                  <span>{errorMsg}</span>
-                </p>
+                <p className="mt-1.5 text-[11px] font-medium text-wine">{errorMsg}</p>
               )}
             </div>
 
-            {/* Security notice (No password or hint displayed) */}
-            <div className="p-2.5 rounded-lg bg-zinc-950/60 border border-zinc-800/80 text-[11px] text-zinc-400 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>Authorized store owner access only. Sessions are encrypted and protected.</span>
+            <div className="flex items-center gap-2 rounded-xl border border-line/70 bg-cream/70 p-3 text-[11px] text-ink-soft">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-brass" />
+              <span>Authorized store owner access only. Sessions lock when you log out.</span>
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-end gap-3 pt-1">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                className="press px-4 py-2 text-[10px] font-bold uppercase tracking-[0.1em] text-ink-soft transition-colors hover:text-ink"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || !password}
-                className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold text-xs rounded-lg transition-all flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                className="press flex items-center gap-2 rounded-full bg-ink px-5 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-cream transition-colors hover:bg-wine disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <span>Unlock Dashboard</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <span>Unlock dashboard</span>
+                <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
           </form>

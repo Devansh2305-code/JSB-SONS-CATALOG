@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Upload, X, Image as ImageIcon, Sparkles, Check, RefreshCw, Palette, User, Shirt } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Sparkles, Check, RefreshCw, Palette, User, Shirt, Wand2, AlertCircle } from 'lucide-react';
 import { renderHangingGarment } from '../../services/hangingGarmentRenderer';
 import { uploadImageToSupabase, isSupabaseConfigured } from '../../services/supabase';
 import { extractColorsFromImage, ExtractedColor } from '../../utils/colorExtractor';
 import { generateVirtualTryOn } from '../../services/virtualTryOnService';
+import { cleanProductImageWithGemini } from '../../services/studioImageService';
 
 interface ProductImageUploaderProps {
   images: string[];
@@ -20,6 +21,7 @@ interface ProductImageUploaderProps {
   modelType?: 'mannequin' | 'model-male' | 'model-female' | 'ghost-mannequin';
   onChangeModelType?: (type: 'mannequin' | 'model-male' | 'model-female' | 'ghost-mannequin') => void;
   onAutoColorDetected?: (colorName: string, colorHex: string, palette: ExtractedColor[]) => void;
+  onStudioCleanChange?: (isStudioClean: boolean) => void;
 }
 
 export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
@@ -37,6 +39,7 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
   modelType = 'mannequin',
   onChangeModelType,
   onAutoColorDetected,
+  onStudioCleanChange,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -47,6 +50,10 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
     'mannequin' | 'model-male' | 'model-female' | 'ghost-mannequin'
   >(modelType);
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [autoStudioClean, setAutoStudioClean] = useState(true);
+  const [isCleaning, setIsCleaning] = useState(false);
+  const [studioCleanApplied, setStudioCleanApplied] = useState(false);
 
   // Resize and compress oversized images to preserve speed and prevent lag
   const processImageFile = async (file: File): Promise<string> => {
@@ -87,10 +94,52 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
     });
   };
 
+  /**
+   * Single Gemini pass per upload: removes the photo background and replaces the
+   * main image with a clean white studio shot. Keeping this to one call protects
+   * API credits while still covering every newly added product.
+   */
+  const runStudioClean = async (sourceUrl: string, baseImages: string[]) => {
+    if (!sourceUrl || baseImages.length === 0) return;
+    setIsCleaning(true);
+    setUploadError(null);
+    setUploadNotice('Removing background with Gemini · preparing white studio image...');
+
+    try {
+      const result = await cleanProductImageWithGemini({
+        imageBase64: sourceUrl,
+        title: title || `${color} ${category}`,
+        category,
+        fabric,
+      });
+
+      if (result.success && result.imageUrl) {
+        const updated = [...baseImages];
+        updated[0] = result.imageUrl;
+        onChangeImages(updated);
+        setStudioCleanApplied(true);
+        onStudioCleanChange?.(true);
+        setUploadNotice(
+          'Gemini studio clean applied — clean white background with original fabric detail preserved.'
+        );
+      } else {
+        setUploadError(result.error || 'Gemini could not clean this photo.');
+        setUploadNotice(null);
+      }
+    } catch (err: any) {
+      setUploadError(err.message || 'Studio cleanup failed.');
+      setUploadNotice(null);
+    } finally {
+      setIsCleaning(false);
+      setTimeout(() => setUploadNotice(null), 5000);
+    }
+  };
+
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setIsProcessing(true);
     setUploadNotice(null);
+    setUploadError(null);
 
     try {
       const newUrls: string[] = [];
@@ -141,11 +190,16 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
           setUploadNotice(`${newUrls.length} photo${newUrls.length > 1 ? 's' : ''} uploaded successfully!`);
         }
 
-        setTimeout(() => setUploadNotice(null), 4000);
+        if (autoStudioClean) {
+          await runStudioClean(updated[0], updated);
+        } else {
+          setTimeout(() => setUploadNotice(null), 4000);
+        }
       }
     } catch (err: any) {
       console.error('Failed to process image:', err);
-      setUploadNotice('Failed to process photo. Please try a different image.');
+      setUploadError('Failed to process photo. Please try a different image.');
+      setUploadNotice(null);
     } finally {
       setIsProcessing(false);
       if (fileInputRef.current) {
@@ -157,6 +211,10 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
   const handleRemoveImage = (index: number) => {
     const updated = images.filter((_, idx) => idx !== index);
     onChangeImages(updated);
+    if (index === 0) {
+      setStudioCleanApplied(false);
+      onStudioCleanChange?.(false);
+    }
   };
 
   // Generate luxury hanging form from the primary photo
@@ -231,6 +289,28 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
         </span>
       </div>
 
+      <label className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/25 bg-zinc-900/70 px-3.5 py-2.5 cursor-pointer">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+            <Wand2 className="w-3.5 h-3.5" />
+          </div>
+          <div>
+            <span className="block text-[11px] font-semibold text-zinc-200">
+              Gemini studio white background
+            </span>
+            <span className="block text-[10px] text-zinc-400 leading-tight">
+              One AI pass per upload · pure white background, original fabric preserved
+            </span>
+          </div>
+        </div>
+        <input
+          type="checkbox"
+          checked={autoStudioClean}
+          onChange={(e) => setAutoStudioClean(e.target.checked)}
+          className="h-4 w-4 accent-amber-400 shrink-0 cursor-pointer"
+        />
+      </label>
+
       {/* Hidden native input with camera & gallery capture */}
       <input
         ref={fileInputRef}
@@ -289,8 +369,19 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
 
       {uploadNotice && (
         <div className="p-2.5 rounded-lg bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fade-in">
-          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          {isCleaning ? (
+            <RefreshCw className="w-4 h-4 text-emerald-400 shrink-0 animate-spin" />
+          ) : (
+            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          )}
           <span>{uploadNotice}</span>
+        </div>
+      )}
+
+      {uploadError && (
+        <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-start gap-2 animate-fade-in">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <span>{uploadError}</span>
         </div>
       )}
 
@@ -325,6 +416,22 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
                   <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-400 text-zinc-950 uppercase tracking-wider shadow">
                     Main Photo
                   </span>
+                )}
+
+                {idx === 0 && studioCleanApplied && (
+                  <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-white text-zinc-900 uppercase tracking-wider shadow flex items-center gap-1">
+                    <Check className="w-2.5 h-2.5" />
+                    White studio
+                  </span>
+                )}
+
+                {idx === 0 && isCleaning && (
+                  <div className="absolute inset-0 bg-zinc-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-2 text-amber-300">
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <span className="text-[9px] font-semibold uppercase tracking-wider">
+                      Cleaning background
+                    </span>
+                  </div>
                 )}
 
                 {/* Remove button */}
@@ -386,6 +493,60 @@ export const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
                 )}
               </div>
             )}
+          </div>
+
+          {/* Gemini studio clean action box */}
+          <div className="p-3.5 rounded-lg bg-zinc-900/90 border border-amber-500/40 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                  <Wand2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="font-semibold text-zinc-200 text-xs block">
+                    Clean studio product image (Gemini)
+                  </span>
+                  <span className="text-zinc-400 text-[11px]">
+                    {studioCleanApplied
+                      ? 'Main photo is on a clean white background with fabric detail preserved.'
+                      : 'Remove the background from the main photo — ideal for a premium catalogue look.'}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    studioCleanApplied &&
+                    !window.confirm(
+                      'Re-clean this photo? This will use one more Gemini image credit.'
+                    )
+                  ) {
+                    return;
+                  }
+                  runStudioClean(images[0], images);
+                }}
+                disabled={isCleaning || isProcessing}
+                className="px-4 py-2 bg-white hover:bg-zinc-100 text-zinc-950 font-semibold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 shadow-sm active:scale-95"
+              >
+                {isCleaning ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Cleaning with Gemini...</span>
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-3.5 h-3.5" />
+                    <span>{studioCleanApplied ? 'Re-clean photo' : 'Clean background'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="text-[10px] text-zinc-500 leading-relaxed">
+              Uses one Gemini image edit to protect API credits. Re-clean only if the first result
+              needs improvement.
+            </p>
           </div>
 
           {/* Virtual Model / Mannequin Try-On Action Box */}
